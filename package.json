@@ -1,6 +1,6 @@
 {
   "name": "monkey-d-bryan",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Bot completo Discord com AutoMod, Anti-Raid, avaliação de perfis, comparação de contas e comandos administrativos",
   "main": "index.js",
   "scripts": {

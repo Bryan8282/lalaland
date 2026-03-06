@@ -1,3 +1,4 @@
+// ================= Monkey D' Bryan - Index.js =================
 const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const mongoose = require("mongoose");
 const { REST } = require("@discordjs/rest");
@@ -39,10 +40,24 @@ async function sendLog(guild, description){
 // ----------------- MONGODB -----------------
 mongoose.connect(MONGO_URI).then(()=>log("✅ Conectado ao MongoDB")).catch(err=>console.error("🚨 Erro ao conectar MongoDB:",err));
 
+// ----------------- FUNÇÃO DE RISCO -----------------
+function calculateRisk(user){
+  let risk = 0;
+  const name = user.username.toLowerCase();
+  if(!user.avatar) risk+=20;
+  if(!user.banner) risk+=20;
+  if(user.createdAt > new Date(Date.now()-7*24*60*60*1000)) risk+=40;
+  if(name.length<3) risk+=10;
+  if(/^[0-9]+$/.test(name)) risk+=20;
+  if(/[^a-z0-9]/i.test(name)) risk+=10;
+  if(name.length>3 && name.split("").every(c=>Math.random()<0.5)) risk+=30; // nome aleatório sintético
+  return risk>100?100:risk;
+}
+
 // ----------------- COMANDOS SLASH -----------------
 const slashCommands = [
   {data:{name:"ping", description:"Responde com Pong!"}, execute: async (interaction)=>await interaction.reply("🏓 Pong!")},
-  
+
   {data:{
     name:"profile", description:"Avalia risco de perfil de um usuário",
     options:[{type:6,name:"user",description:"Usuário para avaliar",required:true}]
@@ -60,7 +75,7 @@ const slashCommands = [
   }},
 
   {data:{
-    name:"compare", description:"Compara duas contas",
+    name:"compare", description:"Compara duas contas e mostra semelhanças",
     options:[
       {type:6,name:"user1",description:"Primeiro usuário",required:true},
       {type:6,name:"user2",description:"Segundo usuário",required:true}
@@ -69,25 +84,20 @@ const slashCommands = [
   execute: async (interaction)=>{
     const u1 = interaction.options.getUser("user1");
     const u2 = interaction.options.getUser("user2");
-    const r1 = calculateRisk(u1);
-    const r2 = calculateRisk(u2);
-    const embed = new EmbedBuilder()
-      .setTitle(`Comparação: ${u1.tag} x ${u2.tag}`)
-      .addFields(
-        {name:u1.tag,value:`Risco: ${r1}/100`,inline:true},
-        {name:u2.tag,value:`Risco: ${r2}/100`,inline:true},
-      )
-      .setColor(r1>r2?"Red":"Green");
+    const embed = new EmbedBuilder().setTitle(`Comparação: ${u1.tag} x ${u2.tag}`).setColor("Blue");
+    let texto = "";
+    texto += `Avatar: ${u1.avatar && u2.avatar ? "mesmo" : "diferente ou ausente"}\n`;
+    texto += `Banner: ${u1.banner && u2.banner ? "mesmo" : "diferente ou ausente"}\n`;
+    texto += `Nome suspeito: ${isNameRandom(u1.username) && isNameRandom(u2.username) ? "ambos aleatórios" : "diferença"}\n`;
+    texto += `Bio: ${(u1.bio && u2.bio) ? "ambos têm" : "diferença"}\n`;
+    texto += `Idade da conta: ${u1.createdAt.toDateString() === u2.createdAt.toDateString() ? "mesma" : "diferente"}\n`;
+    embed.setDescription(texto);
     await interaction.reply({embeds:[embed]});
     sendLog(interaction.guild, `/compare usado entre ${u1.tag} e ${u2.tag}`);
   }},
 
-  {data:{
-    name:"mute", description:"Muta um usuário manualmente",
-    options:[
-      {type:6,name:"user",description:"Usuário a mutar",required:true},
-      {type:4,name:"tempo",description:"Tempo em horas",required:false}
-    ]
+  {data:{name:"mute", description:"Muta um usuário manualmente",
+    options:[{type:6,name:"user",description:"Usuário a mutar",required:true},{type:4,name:"tempo",description:"Tempo em horas",required:false}]
   },
   execute: async (interaction)=>{
     const member = interaction.options.getMember("user");
@@ -114,10 +124,7 @@ const slashCommands = [
   }},
 
   {data:{name:"warn", description:"Registra um aviso para um usuário",
-    options:[
-      {type:6,name:"user",description:"Usuário a avisar",required:true},
-      {type:3,name:"motivo",description:"Motivo do aviso",required:true}
-    ]
+    options:[{type:6,name:"user",description:"Usuário a avisar",required:true},{type:3,name:"motivo",description:"Motivo do aviso",required:true}]
   },
   execute: async (interaction)=>{
     const member = interaction.options.getMember("user");
@@ -136,7 +143,7 @@ const slashCommands = [
     sendLog(interaction.guild, `/kick usado em ${member.user.tag}`);
   }},
 
-  {data:{name:"banconfirm", description:"Botão para confirmar banimento de alerta de risco alto",
+  {data:{name:"banconfirm", description:"Botão para confirmar banimento de alertas Anti-Raid",
     options:[{type:6,name:"user",description:"Usuário a banir",required:true}]
   },
   execute: async (interaction)=>{
@@ -146,7 +153,7 @@ const slashCommands = [
         new ButtonBuilder().setCustomId(`ban_${member.id}`).setLabel("Confirmar Ban").setStyle(ButtonStyle.Danger),
         new ButtonBuilder().setCustomId(`noban_${member.id}`).setLabel("Não Ban").setStyle(ButtonStyle.Secondary)
       );
-    await interaction.reply({content:`Deseja banir ${member.user.tag}?`, components:[row]});
+    await interaction.reply({content:`Alerta Anti-Raid! Deseja banir ${member.user.tag}?`, components:[row]});
   }},
 
   {data:{name:"mutelist", description:"Lista de usuários mutados"},
@@ -193,22 +200,26 @@ const slashCommands = [
       .addFields({name:"Usuários mutados", value:`${mutados}`})
       .setColor("Blue");
     await interaction.reply({embeds:[embed]});
-  }}
+  }},
+
+  {data:{name:"finduser", description:"Busca usuários por nome ou ID",
+    options:[{type:3,name:"termo",description:"Nome ou ID do usuário",required:true}]
+  },
+  execute: async (interaction)=>{
+    const termo = interaction.options.getString("termo").toLowerCase();
+    const members = interaction.guild.members.cache.filter(m=>m.user.username.toLowerCase().includes(termo) || m.user.id===termo);
+    if(!members.size) return interaction.reply("❌ Nenhum usuário encontrado.");
+    await interaction.reply(`🔍 Usuários encontrados:\n${members.map(m=>m.user.tag).join("\n")}`);
+  }},
+
+  {data:{name:"filterlogs", description:"Filtra logs por tipo",
+    options:[{type:3,name:"tipo",description:"Tipo de log: AutoMod, Mute, Ban",required:true}]
+  },
+  execute: async (interaction)=>{ await interaction.reply("📄 Filtrando logs (simulação)"); }},
 ];
 
-// ----------------- FUNÇÃO DE RISCO -----------------
-function calculateRisk(user){
-  let risk = 0;
-  const name = user.username.toLowerCase();
-  if(!user.avatar) risk+=20;
-  if(!user.banner) risk+=20;
-  if(user.createdAt > new Date(Date.now()-7*24*60*60*1000)) risk+=40;
-  if(name.length<3) risk+=10;
-  if(/^[0-9]+$/.test(name)) risk+=20;
-  if(/[^a-z0-9]/i.test(name)) risk+=10;
-  if(name.length>3 && name.split("").every(c=>Math.random()<0.5)) risk+=30; // nome aleatório sintético
-  return risk>100?100:risk;
-}
+// ----------------- AUX -----------------
+function isNameRandom(name){ return name.length>3 && name.split("").every(c=>Math.random()<0.5); }
 
 // ----------------- REGISTRAR COMANDOS -----------------
 client.once("ready", async ()=>{
@@ -221,7 +232,7 @@ client.once("ready", async ()=>{
   }catch(err){console.error("🚨 Erro ao registrar comandos slash:",err);}
 });
 
-// ----------------- INTERAÇÕES SLASH -----------------
+// ----------------- INTERAÇÕES -----------------
 client.on("interactionCreate", async (interaction)=>{
   if(interaction.isButton()){
     const [action, userId] = interaction.customId.split("_");
@@ -246,6 +257,11 @@ client.on("interactionCreate", async (interaction)=>{
 // ----------------- AUTOMOD -----------------
 client.on("messageCreate", async (message)=>{
   if(message.author.bot) return;
+
+  // resposta ao marcar o bot
+  if(message.mentions.has(client.user)) return message.reply("shut up nigga");
+
+  // filtragem AutoMod
   if(pornLinks.some(l=>message.content.toLowerCase().includes(l)) || blockedWords.some(w=>message.content.toLowerCase().includes(w))){
     try{
       await message.delete();

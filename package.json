@@ -1,7 +1,7 @@
 {
   "name": "monkeyd-bryan-bot",
   "version": "1.0.0",
-  "description": "Bot de segurança Monkey D' Bryan",
+  "description": "Bot de segurança Monkey D' Bryan com AutoMod, logs e avaliação de perfis",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

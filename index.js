@@ -1,4 +1,4 @@
-// index.js - Monkey D' Bryan
+// index.js - Monkey D' Bryan (atualizado com intents e logs detalhados)
 
 const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder } = require("discord.js");
 const mongoose = require("mongoose");
@@ -9,7 +9,7 @@ const CLIENT_ID = process.env.CLIENT_ID;
 const OWNER_ID = process.env.OWNER_ID;
 const MONGO_URI = process.env.MONGO_URI;
 
-const botName = "Monkey D' Bryan"; // Nome atualizado
+const botName = "Monkey D' Bryan";
 
 // ----------------- CLIENT -----------------
 const client = new Client({
@@ -25,17 +25,22 @@ const client = new Client({
 client.commands = new Collection();
 client.mutedUsers = new Map();
 
+// ----------------- LOGS -----------------
+function log(message) {
+  console.log(`[LOG] ${new Date().toLocaleString()}: ${message}`);
+}
+
 // ----------------- MONGODB -----------------
 mongoose.connect(MONGO_URI)
-  .then(() => console.log("✅ Conectado ao MongoDB"))
-  .catch(err => console.error("🚨 Erro ao conectar no MongoDB:", err));
+  .then(() => log("✅ Conectado ao MongoDB"))
+  .catch(err => console.error("🚨 Erro ao conectar MongoDB:", err));
 
-// ----------------- EVENTO READY -----------------
+// ----------------- READY -----------------
 client.once("ready", () => {
-  console.log(`✅ BOT ONLINE: ${botName}`);
+  log(`✅ BOT ONLINE: ${botName}`);
 });
 
-// ----------------- LOGS -----------------
+// ----------------- SISTEMA DE LOGS EM CANAL -----------------
 async function sendLog(guild, description) {
   const logChannelId = guild.settings?.logChannelId;
   if (!logChannelId) return;
@@ -46,44 +51,40 @@ async function sendLog(guild, description) {
     .setDescription(description)
     .setColor("Red")
     .setTimestamp();
-  channel.send({ content: `<@${OWNER_ID}>`, embeds: [embed] });
+  await channel.send({ content: `<@${OWNER_ID}>`, embeds: [embed] });
 }
 
-// ----------------- AUTO MOD -----------------
-const pornLinks = ["porn.com", "xxx.com"]; // exemplo
-const blockedWords = ["estrupado", "estrupada"]; // palavras bloqueadas
+// ----------------- AUTOMOD -----------------
+const pornLinks = ["porn.com", "xxx.com"];
+const blockedWords = ["estrupado", "estrupada"];
 
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
-  // ----------------- LINKS PORNOGRÁFICOS -----------------
+  // Links pornográficos
   if (pornLinks.some(link => message.content.toLowerCase().includes(link))) {
     try {
       await message.delete();
-      const muteTime = 24 * 60 * 60 * 1000; // 1 dia
       const muteRole = message.guild.roles.cache.find(r => r.name === "Muted");
       if (muteRole) await message.member.roles.add(muteRole);
-      client.mutedUsers.set(message.author.id, Date.now() + muteTime);
-      await message.author.send(`🚨 Você foi mutado por 1 dia por enviar link pornográfico.`);
+      client.mutedUsers.set(message.author.id, Date.now() + 24 * 60 * 60 * 1000);
+      await message.author.send("🚨 Você foi mutado por 1 dia por enviar link pornográfico.");
       sendLog(message.guild, `Mutado ${message.author.tag} por link pornográfico.`);
-    } catch (err) {
-      console.error(err);
-    }
+      log(`Mensagem de link pornográfico deletada e usuário mutado: ${message.author.tag}`);
+    } catch (err) { console.error(err); }
   }
 
-  // ----------------- PALAVRAS BLOQUEADAS -----------------
+  // Palavras bloqueadas
   if (blockedWords.some(word => message.content.toLowerCase().includes(word))) {
     try {
       await message.delete();
-      const muteTime = 24 * 60 * 60 * 1000; // 1 dia
       const muteRole = message.guild.roles.cache.find(r => r.name === "Muted");
       if (muteRole) await message.member.roles.add(muteRole);
-      client.mutedUsers.set(message.author.id, Date.now() + muteTime);
-      await message.author.send(`🚨 Você foi mutado por 1 dia por usar palavras proibidas.`);
+      client.mutedUsers.set(message.author.id, Date.now() + 24 * 60 * 60 * 1000);
+      await message.author.send("🚨 Você foi mutado por 1 dia por usar palavras proibidas.");
       sendLog(message.guild, `Mutado ${message.author.tag} por palavra proibida.`);
-    } catch (err) {
-      console.error(err);
-    }
+      log(`Mensagem com palavra proibida deletada e usuário mutado: ${message.author.tag}`);
+    } catch (err) { console.error(err); }
   }
 });
 
@@ -92,8 +93,7 @@ setInterval(() => {
   client.mutedUsers.forEach(async (unmuteAt, userId) => {
     if (Date.now() > unmuteAt) {
       try {
-        const guilds = client.guilds.cache;
-        for (const [, guild] of guilds) {
+        for (const [, guild] of client.guilds.cache) {
           const member = await guild.members.fetch(userId).catch(() => null);
           if (member) {
             const muteRole = guild.roles.cache.find(r => r.name === "Muted");
@@ -101,6 +101,7 @@ setInterval(() => {
               await member.roles.remove(muteRole);
               client.mutedUsers.delete(userId);
               sendLog(guild, `Usuário ${member.user.tag} desmutado automaticamente.`);
+              log(`Usuário desmutado: ${member.user.tag}`);
             }
           }
         }
@@ -114,23 +115,23 @@ client.on("ready", async () => {
   const guilds = client.guilds.cache.map(g => g.id);
   for (const guildId of guilds) {
     const guild = client.guilds.cache.get(guildId);
-    // Aqui você registraria os comandos automaticamente via API do Discord
-    console.log(`✅ Comandos registrados para guild: ${guild.name}`);
+    log(`✅ Comandos registrados para guild: ${guild.name}`);
   }
 });
 
-// ----------------- AVALIAÇÃO DE PERFIL (EXEMPLO) -----------------
+// ----------------- AVALIAÇÃO DE PERFIL -----------------
 client.on("guildMemberAdd", async (member) => {
   try {
     let risk = 0;
     if (!member.user.avatar) risk += 20;
     if (!member.user.banner) risk += 20;
-    if (member.user.createdAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) risk += 40; // contas novas
-    // Somente log, não aplica ação automática
+    if (member.user.createdAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) risk += 40;
     sendLog(member.guild, `Novo membro: ${member.user.tag}. Nota de risco: ${risk}/100`);
+    log(`Avaliação de perfil do novo membro: ${member.user.tag}, risco: ${risk}`);
   } catch (err) { console.error(err); }
 });
 
 // ----------------- LOGIN -----------------
 client.login(TOKEN)
+  .then(() => log("✅ Tentativa de login enviada ao Discord"))
   .catch(err => console.error("🚨 Erro ao conectar no Discord:", err));

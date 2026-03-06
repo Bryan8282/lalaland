@@ -4,7 +4,6 @@ const mongoose = require("mongoose");
 const { REST } = require("@discordjs/rest");
 const { Routes } = require("discord-api-types/v10");
 
-// ----------------- CONFIGURAÇÃO -----------------
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const OWNER_ID = process.env.OWNER_ID;
@@ -58,7 +57,7 @@ function isNameRandom(name){ return name.length>3 && name.split("").every(c=>Mat
 // ----------------- COMANDOS SLASH -----------------
 const slashCommands = [
   {data:{name:"ping", description:"Responde com Pong!"}, execute: async (interaction)=>await interaction.reply("🏓 Pong!")},
-  
+
   {data:{name:"profile", description:"Avalia risco de perfil de um usuário",
     options:[{type:6,name:"user",description:"Usuário para avaliar",required:true}]
   },
@@ -95,9 +94,72 @@ const slashCommands = [
     sendLog(interaction.guild, `/compare usado entre ${u1.tag} e ${u2.tag}`);
   }},
 
-  // ---------------- OUTROS COMANDOS PLANEJADOS ----------------
-  // mute, unmute, warn, kick, banconfirm, mutelist, setlog, showlogs, config, userinfo, stats, finduser, filterlogs
-  // Para cada um você adicionaria data e execute como os exemplos acima
+  // ================= COMANDOS ADMINISTRATIVOS =================
+  // mute
+  {data:{name:"mute", description:"Silencia um usuário", options:[{type:6,name:"user",description:"Usuário a mutar",required:true},{type:4,name:"duration",description:"Duração em minutos",required:false}]},
+  execute: async (interaction)=>{
+    const user = interaction.options.getUser("user");
+    const duration = interaction.options.getInteger("duration") || 60;
+    const member = await interaction.guild.members.fetch(user.id);
+    const muteRole = interaction.guild.roles.cache.find(r=>r.name==="Muted");
+    if(muteRole) await member.roles.add(muteRole);
+    client.mutedUsers.set(user.id,Date.now()+duration*60*1000);
+    await interaction.reply({content:`✅ ${user.tag} mutado por ${duration} minutos.`});
+    sendLog(interaction.guild, `Mute aplicado em ${user.tag} por ${duration} minutos`);
+  }},
+
+  // unmute
+  {data:{name:"unmute", description:"Desmutar usuário", options:[{type:6,name:"user",description:"Usuário a desmutar",required:true}]},
+  execute: async (interaction)=>{
+    const user = interaction.options.getUser("user");
+    const member = await interaction.guild.members.fetch(user.id);
+    const muteRole = interaction.guild.roles.cache.find(r=>r.name==="Muted");
+    if(muteRole && member.roles.cache.has(muteRole.id)) await member.roles.remove(muteRole);
+    client.mutedUsers.delete(user.id);
+    await interaction.reply({content:`✅ ${user.tag} desmutado.`});
+    sendLog(interaction.guild, `Desmute aplicado em ${user.tag}`);
+  }},
+
+  // warn
+  {data:{name:"warn", description:"Aviso para usuário", options:[{type:6,name:"user",description:"Usuário a avisar",required:true},{type:3,name:"reason",description:"Motivo",required:false}]},
+  execute: async (interaction)=>{
+    const user = interaction.options.getUser("user");
+    const reason = interaction.options.getString("reason") || "Não especificado";
+    await interaction.reply({content:`⚠️ ${user.tag} foi avisado. Motivo: ${reason}`});
+    sendLog(interaction.guild, `Aviso aplicado em ${user.tag}. Motivo: ${reason}`);
+  }},
+
+  // kick
+  {data:{name:"kick", description:"Expulsa usuário do servidor", options:[{type:6,name:"user",description:"Usuário a expulsar",required:true},{type:3,name:"reason",description:"Motivo",required:false}]},
+  execute: async (interaction)=>{
+    const user = interaction.options.getUser("user");
+    const reason = interaction.options.getString("reason") || "Não especificado";
+    const member = await interaction.guild.members.fetch(user.id);
+    await member.kick(reason);
+    await interaction.reply({content:`✅ ${user.tag} expulso. Motivo: ${reason}`});
+    sendLog(interaction.guild, `Kick aplicado em ${user.tag}. Motivo: ${reason}`);
+  }},
+
+  // banconfirm
+  {data:{name:"banconfirm", description:"Botão de confirmação de ban", options:[{type:6,name:"user",description:"Usuário a banir",required:true}]},
+  execute: async (interaction)=>{
+    const user = interaction.options.getUser("user");
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder().setCustomId(`ban_${user.id}`).setLabel("Confirmar Ban").setStyle(ButtonStyle.Danger),
+      new ButtonBuilder().setCustomId(`noban_${user.id}`).setLabel("Cancelar").setStyle(ButtonStyle.Secondary)
+    );
+    await interaction.reply({content:`Deseja banir ${user.tag}?`, components:[row]});
+    sendLog(interaction.guild, `Ban solicitado para ${user.tag}`);
+  }},
+
+  // mutelist
+  {data:{name:"mutelist", description:"Mostra lista de mutados"},
+  execute: async (interaction)=>{
+    const list = Array.from(client.mutedUsers.keys()).map(id=>`<@${id}>`).join("\n") || "Nenhum usuário mutado";
+    await interaction.reply({content:`📋 Usuários mutados:\n${list}`});
+  }},
+
+  // ... e demais comandos administrativos (setlog, showlogs, config, userinfo, stats, finduser, filterlogs) podem ser adicionados na mesma estrutura
 ];
 
 // ----------------- REGISTRAR COMANDOS -----------------

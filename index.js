@@ -22,13 +22,15 @@ const client = new Client({
 });
 
 client.mutedUsers = new Map();
+client.guildLogs = new Map(); // salva logChannelId por guild
+
 const blockedWords = ["estrupado","estrupada"];
 const pornLinks = ["porn.com","xxx.com"];
 
 // ----------------- LOGS -----------------
 function log(message){ console.log(`[LOG] ${new Date().toLocaleString()}: ${message}`); }
 async function sendLog(guild, description){
-  const logChannelId = guild.settings?.logChannelId;
+  const logChannelId = client.guildLogs.get(guild.id);
   if(!logChannelId) return;
   const channel = guild.channels.cache.get(logChannelId);
   if(!channel) return;
@@ -94,8 +96,7 @@ const slashCommands = [
     sendLog(interaction.guild, `/compare usado entre ${u1.tag} e ${u2.tag}`);
   }},
 
-  // ================= COMANDOS ADMINISTRATIVOS =================
-  // mute
+  // ---------------- COMANDOS ADMINISTRATIVOS ----------------
   {data:{name:"mute", description:"Silencia um usuário", options:[{type:6,name:"user",description:"Usuário a mutar",required:true},{type:4,name:"duration",description:"Duração em minutos",required:false}]},
   execute: async (interaction)=>{
     const user = interaction.options.getUser("user");
@@ -108,7 +109,6 @@ const slashCommands = [
     sendLog(interaction.guild, `Mute aplicado em ${user.tag} por ${duration} minutos`);
   }},
 
-  // unmute
   {data:{name:"unmute", description:"Desmutar usuário", options:[{type:6,name:"user",description:"Usuário a desmutar",required:true}]},
   execute: async (interaction)=>{
     const user = interaction.options.getUser("user");
@@ -120,7 +120,6 @@ const slashCommands = [
     sendLog(interaction.guild, `Desmute aplicado em ${user.tag}`);
   }},
 
-  // warn
   {data:{name:"warn", description:"Aviso para usuário", options:[{type:6,name:"user",description:"Usuário a avisar",required:true},{type:3,name:"reason",description:"Motivo",required:false}]},
   execute: async (interaction)=>{
     const user = interaction.options.getUser("user");
@@ -129,7 +128,6 @@ const slashCommands = [
     sendLog(interaction.guild, `Aviso aplicado em ${user.tag}. Motivo: ${reason}`);
   }},
 
-  // kick
   {data:{name:"kick", description:"Expulsa usuário do servidor", options:[{type:6,name:"user",description:"Usuário a expulsar",required:true},{type:3,name:"reason",description:"Motivo",required:false}]},
   execute: async (interaction)=>{
     const user = interaction.options.getUser("user");
@@ -140,7 +138,6 @@ const slashCommands = [
     sendLog(interaction.guild, `Kick aplicado em ${user.tag}. Motivo: ${reason}`);
   }},
 
-  // banconfirm
   {data:{name:"banconfirm", description:"Botão de confirmação de ban", options:[{type:6,name:"user",description:"Usuário a banir",required:true}]},
   execute: async (interaction)=>{
     const user = interaction.options.getUser("user");
@@ -152,14 +149,19 @@ const slashCommands = [
     sendLog(interaction.guild, `Ban solicitado para ${user.tag}`);
   }},
 
-  // mutelist
   {data:{name:"mutelist", description:"Mostra lista de mutados"},
   execute: async (interaction)=>{
     const list = Array.from(client.mutedUsers.keys()).map(id=>`<@${id}>`).join("\n") || "Nenhum usuário mutado";
     await interaction.reply({content:`📋 Usuários mutados:\n${list}`});
   }},
 
-  // ... e demais comandos administrativos (setlog, showlogs, config, userinfo, stats, finduser, filterlogs) podem ser adicionados na mesma estrutura
+  {data:{name:"setlog", description:"Define canal de logs", options:[{type:7,name:"channel",description:"Canal de logs",required:true}]},
+  execute: async (interaction)=>{
+    const channel = interaction.options.getChannel("channel");
+    client.guildLogs.set(interaction.guild.id, channel.id);
+    await interaction.reply({content:`✅ Canal de logs definido para ${channel}`});
+    log(`Canal de logs do servidor ${interaction.guild.name} definido para ${channel.name}`);
+  }},
 ];
 
 // ----------------- REGISTRAR COMANDOS -----------------
@@ -237,9 +239,9 @@ setInterval(()=>{
 // ----------------- AVALIAÇÃO DE NOVOS MEMBROS -----------------
 client.on("guildMemberAdd", async member => {
   const risk = calculateRisk(member.user);
-
-  if(!member.guild.settings || !member.guild.settings.logChannelId) return;
-  const logChannel = member.guild.channels.cache.get(member.guild.settings.logChannelId);
+  const logChannelId = client.guildLogs.get(member.guild.id);
+  if(!logChannelId) return;
+  const logChannel = member.guild.channels.cache.get(logChannelId);
   if(!logChannel) return;
 
   const embed = new EmbedBuilder()

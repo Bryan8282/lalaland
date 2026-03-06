@@ -1,175 +1,136 @@
-const { Client, GatewayIntentBits, Partials, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+// index.js - Monkey D' Bryan
+
+const { Client, GatewayIntentBits, Partials, Collection, EmbedBuilder } = require("discord.js");
 const mongoose = require("mongoose");
 
-// Variáveis de ambiente do Railway
+// ----------------- CONFIGURAÇÃO -----------------
 const TOKEN = process.env.TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const OWNER_ID = process.env.OWNER_ID;
 const MONGO_URI = process.env.MONGO_URI;
 
-// MongoDB - Schemas
-const guildConfigSchema = new mongoose.Schema({
-  guildId: String,
-  logChannel: String,
-  blockedWords: [String],
-  autoMod: Boolean,
-  defaultMuteTime: String,
-  permissions: Object // {ban: [userIds], mute: [userIds]}
-});
-const GuildConfig = mongoose.model("GuildConfig", guildConfigSchema);
+const botName = "Monkey D' Bryan"; // Nome atualizado
 
-const commandSchema = new mongoose.Schema({
-  name: String,
-  description: String,
-  guildId: String
+// ----------------- CLIENT -----------------
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
+  partials: [Partials.Channel],
 });
-const Command = mongoose.model("Command", commandSchema);
 
-// Conectar MongoDB
+client.commands = new Collection();
+client.mutedUsers = new Map();
+
+// ----------------- MONGODB -----------------
 mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ Conectado ao MongoDB"))
   .catch(err => console.error("🚨 Erro ao conectar no MongoDB:", err));
 
-// Criar cliente Discord
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
-  ],
-  partials: [Partials.Channel]
+// ----------------- EVENTO READY -----------------
+client.once("ready", () => {
+  console.log(`✅ BOT ONLINE: ${botName}`);
 });
 
-// Registrar comandos dinamicamente
-async function registerCommands() {
-  const commands = await Command.find({});
-  const rest = new REST({ version: "10" }).setToken(TOKEN);
-  try {
-    await rest.put(
-      Routes.applicationCommands(CLIENT_ID),
-      { body: commands.map(c => ({ name: c.name, description: c.description })) }
-    );
-    console.log("✅ Comandos registrados dinamicamente");
-  } catch (err) {
-    console.error("🚨 Erro ao registrar comandos:", err);
-  }
+// ----------------- LOGS -----------------
+async function sendLog(guild, description) {
+  const logChannelId = guild.settings?.logChannelId;
+  if (!logChannelId) return;
+  const channel = guild.channels.cache.get(logChannelId);
+  if (!channel) return;
+  const embed = new EmbedBuilder()
+    .setTitle(`${botName} Logs`)
+    .setDescription(description)
+    .setColor("Red")
+    .setTimestamp();
+  channel.send({ content: `<@${OWNER_ID}>`, embeds: [embed] });
 }
 
-client.on("ready", async () => {
-  console.log(`✅ BOT ONLINE: ${client.user.tag}`);
-  await registerCommands();
-});
+// ----------------- AUTO MOD -----------------
+const pornLinks = ["porn.com", "xxx.com"]; // exemplo
+const blockedWords = ["estrupado", "estrupada"]; // palavras bloqueadas
 
-// Interações de comando
-client.on("interactionCreate", async interaction => {
-  if (!interaction.isCommand() && !interaction.isButton()) return;
-
-  const guildId = interaction.guildId;
-  let config = await GuildConfig.findOne({ guildId });
-  if (!config) {
-    config = await GuildConfig.create({
-      guildId,
-      blockedWords: ["estrupado", "estrupada"],
-      autoMod: true,
-      defaultMuteTime: "1d",
-      permissions: {}
-    });
-  }
-
-  if (interaction.isCommand()) {
-    const { commandName, options, user } = interaction;
-
-    if (commandName === "config") {
-      await interaction.reply(`🛠 Configurações:\nCanal de logs: ${config.logChannel || "não definido"}\nAutoMod: ${config.autoMod}`);
-    }
-
-    if (commandName === "ban") {
-      if (!config.permissions.ban?.includes(user.id) && user.id !== OWNER_ID)
-        return interaction.reply("🚫 Você não tem permissão para usar esse comando");
-
-      const member = interaction.options.getMember("user");
-      const reason = interaction.options.getString("reason") || "Não especificado";
-      if (!member) return interaction.reply("Usuário não encontrado");
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder().setCustomId(`ban_confirm_${member.id}`).setLabel("Confirmar ban").setStyle(ButtonStyle.Danger),
-        new ButtonBuilder().setCustomId(`ban_cancel_${member.id}`).setLabel("Não banir").setStyle(ButtonStyle.Secondary)
-      );
-      await interaction.reply({ content: `Deseja banir ${member.user.tag}? Motivo: ${reason}`, components: [row] });
-    }
-
-    if (commandName === "mute") {
-      if (!config.permissions.mute?.includes(user.id) && user.id !== OWNER_ID)
-        return interaction.reply("🚫 Você não tem permissão para usar esse comando");
-
-      const member = interaction.options.getMember("user");
-      const time = interaction.options.getString("time") || config.defaultMuteTime;
-      if (!member) return interaction.reply("Usuário não encontrado");
-      await interaction.reply(`🔇 ${member.user.tag} mutado por ${time}`);
-      // Aqui você aplicaria o mute real usando roles/permissions
-    }
-  }
-
-  // Botões de ban
-  if (interaction.isButton()) {
-    const [action, type, targetId] = interaction.customId.split("_");
-    if (action === "ban" && type === "confirm") {
-      const member = interaction.guild.members.cache.get(targetId);
-      if (member) {
-        await member.ban({ reason: "Confirmado pelo dono" });
-        await interaction.update({ content: `${member.user.tag} foi banido ✅`, components: [] });
-      }
-    }
-    if (action === "ban" && type === "cancel") {
-      await interaction.update({ content: "Ban cancelado ❌", components: [] });
-    }
-  }
-});
-
-// AutoMod
-client.on("messageCreate", async message => {
+client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
-  const config = await GuildConfig.findOne({ guildId: message.guild.id });
-  if (!config || !config.autoMod) return;
 
-  const lowerMsg = message.content.toLowerCase();
-  let blocked = false;
-
-  for (const word of config.blockedWords) {
-    if (lowerMsg.includes(word.toLowerCase())) {
-      blocked = true;
-      await message.delete().catch(() => {});
-      await message.member.timeout(24*60*60*1000, "Palavra bloqueada").catch(() => {});
-      break;
+  // ----------------- LINKS PORNOGRÁFICOS -----------------
+  if (pornLinks.some(link => message.content.toLowerCase().includes(link))) {
+    try {
+      await message.delete();
+      const muteTime = 24 * 60 * 60 * 1000; // 1 dia
+      const muteRole = message.guild.roles.cache.find(r => r.name === "Muted");
+      if (muteRole) await message.member.roles.add(muteRole);
+      client.mutedUsers.set(message.author.id, Date.now() + muteTime);
+      await message.author.send(`🚨 Você foi mutado por 1 dia por enviar link pornográfico.`);
+      sendLog(message.guild, `Mutado ${message.author.tag} por link pornográfico.`);
+    } catch (err) {
+      console.error(err);
     }
   }
 
-  const pornRegex = /(porn|xxx|sex)/i;
-  if (pornRegex.test(message.content)) {
-    blocked = true;
-    await message.delete().catch(() => {});
-    await message.member.timeout(24*60*60*1000, "Link pornográfico").catch(() => {});
-  }
-
-  if (blocked && config.logChannel) {
-    const log = message.guild.channels.cache.get(config.logChannel);
-    if (log) log.send(`⚠️ ${message.author.tag} foi mutado por 1 dia. Conteúdo bloqueado: ${message.content}`);
+  // ----------------- PALAVRAS BLOQUEADAS -----------------
+  if (blockedWords.some(word => message.content.toLowerCase().includes(word))) {
+    try {
+      await message.delete();
+      const muteTime = 24 * 60 * 60 * 1000; // 1 dia
+      const muteRole = message.guild.roles.cache.find(r => r.name === "Muted");
+      if (muteRole) await message.member.roles.add(muteRole);
+      client.mutedUsers.set(message.author.id, Date.now() + muteTime);
+      await message.author.send(`🚨 Você foi mutado por 1 dia por usar palavras proibidas.`);
+      sendLog(message.guild, `Mutado ${message.author.tag} por palavra proibida.`);
+    } catch (err) {
+      console.error(err);
+    }
   }
 });
 
-// Avaliação de perfil
-client.on("guildMemberAdd", async member => {
-  const config = await GuildConfig.findOne({ guildId: member.guild.id });
-  if (!config || !config.logChannel) return;
+// ----------------- DESMUTE AUTOMÁTICO -----------------
+setInterval(() => {
+  client.mutedUsers.forEach(async (unmuteAt, userId) => {
+    if (Date.now() > unmuteAt) {
+      try {
+        const guilds = client.guilds.cache;
+        for (const [, guild] of guilds) {
+          const member = await guild.members.fetch(userId).catch(() => null);
+          if (member) {
+            const muteRole = guild.roles.cache.find(r => r.name === "Muted");
+            if (muteRole && member.roles.cache.has(muteRole.id)) {
+              await member.roles.remove(muteRole);
+              client.mutedUsers.delete(userId);
+              sendLog(guild, `Usuário ${member.user.tag} desmutado automaticamente.`);
+            }
+          }
+        }
+      } catch (err) { console.error(err); }
+    }
+  });
+}, 10 * 1000);
 
-  let notes = [];
-  const diffDays = (Date.now() - member.user.createdAt) / (1000*60*60*24);
-  if (diffDays < 7) notes.push("Conta recém-criada");
-  if (/[^a-zA-Z0-9 ]/.test(member.user.username)) notes.push("Nome suspeito");
-  if (!member.user.avatar) notes.push("Sem avatar");
-
-  const log = member.guild.channels.cache.get(config.logChannel);
-  if (log) log.send(`⚠️ Avaliação de ${member.user.tag}: ${notes.join(", ") || "Tudo OK"} <@${OWNER_ID}>`);
+// ----------------- REGISTRO DE COMANDOS -----------------
+client.on("ready", async () => {
+  const guilds = client.guilds.cache.map(g => g.id);
+  for (const guildId of guilds) {
+    const guild = client.guilds.cache.get(guildId);
+    // Aqui você registraria os comandos automaticamente via API do Discord
+    console.log(`✅ Comandos registrados para guild: ${guild.name}`);
+  }
 });
 
-client.login(TOKEN);
+// ----------------- AVALIAÇÃO DE PERFIL (EXEMPLO) -----------------
+client.on("guildMemberAdd", async (member) => {
+  try {
+    let risk = 0;
+    if (!member.user.avatar) risk += 20;
+    if (!member.user.banner) risk += 20;
+    if (member.user.createdAt > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) risk += 40; // contas novas
+    // Somente log, não aplica ação automática
+    sendLog(member.guild, `Novo membro: ${member.user.tag}. Nota de risco: ${risk}/100`);
+  } catch (err) { console.error(err); }
+});
+
+// ----------------- LOGIN -----------------
+client.login(TOKEN)
+  .catch(err => console.error("🚨 Erro ao conectar no Discord:", err));

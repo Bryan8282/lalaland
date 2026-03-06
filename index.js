@@ -1,8 +1,11 @@
 const { Client, GatewayIntentBits, Partials, REST, Routes, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const mongoose = require("mongoose");
-require("dotenv").config();
 
+// Variáveis de ambiente do Railway
+const TOKEN = process.env.TOKEN;
+const CLIENT_ID = process.env.CLIENT_ID;
 const OWNER_ID = process.env.OWNER_ID;
+const MONGO_URI = process.env.MONGO_URI;
 
 // MongoDB - Schemas
 const guildConfigSchema = new mongoose.Schema({
@@ -23,11 +26,11 @@ const commandSchema = new mongoose.Schema({
 const Command = mongoose.model("Command", commandSchema);
 
 // Conectar MongoDB
-mongoose.connect(process.env.MONGO_URI)
+mongoose.connect(MONGO_URI)
   .then(() => console.log("✅ Conectado ao MongoDB"))
   .catch(err => console.error("🚨 Erro ao conectar no MongoDB:", err));
 
-// Criar cliente
+// Criar cliente Discord
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -41,10 +44,10 @@ const client = new Client({
 // Registrar comandos dinamicamente
 async function registerCommands() {
   const commands = await Command.find({});
-  const rest = new REST({ version: "10" }).setToken(process.env.TOKEN);
+  const rest = new REST({ version: "10" }).setToken(TOKEN);
   try {
     await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
+      Routes.applicationCommands(CLIENT_ID),
       { body: commands.map(c => ({ name: c.name, description: c.description })) }
     );
     console.log("✅ Comandos registrados dinamicamente");
@@ -58,7 +61,7 @@ client.on("ready", async () => {
   await registerCommands();
 });
 
-// Interação de comando
+// Interações de comando
 client.on("interactionCreate", async interaction => {
   if (!interaction.isCommand() && !interaction.isButton()) return;
 
@@ -74,7 +77,6 @@ client.on("interactionCreate", async interaction => {
     });
   }
 
-  // Comandos
   if (interaction.isCommand()) {
     const { commandName, options, user } = interaction;
 
@@ -104,11 +106,11 @@ client.on("interactionCreate", async interaction => {
       const time = interaction.options.getString("time") || config.defaultMuteTime;
       if (!member) return interaction.reply("Usuário não encontrado");
       await interaction.reply(`🔇 ${member.user.tag} mutado por ${time}`);
-      // Aplicar mute real usando roles/permissions
+      // Aqui você aplicaria o mute real usando roles/permissions
     }
   }
 
-  // Botões
+  // Botões de ban
   if (interaction.isButton()) {
     const [action, type, targetId] = interaction.customId.split("_");
     if (action === "ban" && type === "confirm") {
@@ -133,25 +135,22 @@ client.on("messageCreate", async message => {
   const lowerMsg = message.content.toLowerCase();
   let blocked = false;
 
-  // Palavras bloqueadas
   for (const word of config.blockedWords) {
     if (lowerMsg.includes(word.toLowerCase())) {
       blocked = true;
       await message.delete().catch(() => {});
-      await message.member.timeout(24 * 60 * 60 * 1000, "Palavra bloqueada").catch(() => {});
+      await message.member.timeout(24*60*60*1000, "Palavra bloqueada").catch(() => {});
       break;
     }
   }
 
-  // Links pornográficos
   const pornRegex = /(porn|xxx|sex)/i;
   if (pornRegex.test(message.content)) {
     blocked = true;
     await message.delete().catch(() => {});
-    await message.member.timeout(24 * 60 * 60 * 1000, "Link pornográfico").catch(() => {});
+    await message.member.timeout(24*60*60*1000, "Link pornográfico").catch(() => {});
   }
 
-  // Log
   if (blocked && config.logChannel) {
     const log = message.guild.channels.cache.get(config.logChannel);
     if (log) log.send(`⚠️ ${message.author.tag} foi mutado por 1 dia. Conteúdo bloqueado: ${message.content}`);
@@ -173,4 +172,4 @@ client.on("guildMemberAdd", async member => {
   if (log) log.send(`⚠️ Avaliação de ${member.user.tag}: ${notes.join(", ") || "Tudo OK"} <@${OWNER_ID}>`);
 });
 
-client.login(process.env.TOKEN);
+client.login(TOKEN);

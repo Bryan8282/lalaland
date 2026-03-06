@@ -1,1 +1,17 @@
-
+{
+  "name": "delta-bot",
+  "version": "1.0.0",
+  "description": "Bot de segurança completo com AutoMod, logs e avaliação de perfil",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.13.0",
+    "mongoose": "^7.7.0",
+    "dotenv": "^16.3.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

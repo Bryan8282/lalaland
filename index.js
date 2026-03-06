@@ -53,15 +53,13 @@ function calculateRisk(user){
   if(name.length>3 && name.split("").every(c=>Math.random()<0.5)) risk+=30; // nome aleatório sintético
   return risk>100?100:risk;
 }
-
-// ----------------- AUX -----------------
 function isNameRandom(name){ return name.length>3 && name.split("").every(c=>Math.random()<0.5); }
 
 // ----------------- COMANDOS SLASH -----------------
 const slashCommands = [
   {data:{name:"ping", description:"Responde com Pong!"}, execute: async (interaction)=>await interaction.reply("🏓 Pong!")},
-  {data:{
-    name:"profile", description:"Avalia risco de perfil de um usuário",
+  
+  {data:{name:"profile", description:"Avalia risco de perfil de um usuário",
     options:[{type:6,name:"user",description:"Usuário para avaliar",required:true}]
   },
   execute: async (interaction)=>{
@@ -75,8 +73,8 @@ const slashCommands = [
     await interaction.reply({embeds:[embed]});
     sendLog(interaction.guild, `Comando /profile usado em ${user.tag}. Nota de risco: ${risk}`);
   }},
-  {data:{
-    name:"compare", description:"Compara duas contas e mostra semelhanças",
+
+  {data:{name:"compare", description:"Compara duas contas e mostra semelhanças",
     options:[
       {type:6,name:"user1",description:"Primeiro usuário",required:true},
       {type:6,name:"user2",description:"Segundo usuário",required:true}
@@ -96,7 +94,10 @@ const slashCommands = [
     await interaction.reply({embeds:[embed]});
     sendLog(interaction.guild, `/compare usado entre ${u1.tag} e ${u2.tag}`);
   }},
-  // ... (outros comandos como mute, unmute, warn, kick, banconfirm, mutelist, setlog, showlogs, config, userinfo, stats, finduser, filterlogs)
+
+  // ---------------- OUTROS COMANDOS PLANEJADOS ----------------
+  // mute, unmute, warn, kick, banconfirm, mutelist, setlog, showlogs, config, userinfo, stats, finduser, filterlogs
+  // Para cada um você adicionaria data e execute como os exemplos acima
 ];
 
 // ----------------- REGISTRAR COMANDOS -----------------
@@ -135,11 +136,8 @@ client.on("interactionCreate", async (interaction)=>{
 // ----------------- AUTOMOD -----------------
 client.on("messageCreate", async (message)=>{
   if(message.author.bot) return;
-
-  // resposta ao marcar o bot
   if(message.mentions.has(client.user)) return message.reply("shut up nigga");
 
-  // filtragem AutoMod
   if(pornLinks.some(l=>message.content.toLowerCase().includes(l)) || blockedWords.some(w=>message.content.toLowerCase().includes(w))){
     try{
       await message.delete();
@@ -178,9 +176,7 @@ setInterval(()=>{
 client.on("guildMemberAdd", async member => {
   const risk = calculateRisk(member.user);
 
-  // Apenas avalia se houver canal de logs configurado
   if(!member.guild.settings || !member.guild.settings.logChannelId) return;
-
   const logChannel = member.guild.channels.cache.get(member.guild.settings.logChannelId);
   if(!logChannel) return;
 

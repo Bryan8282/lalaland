@@ -1,14 +1,27 @@
 {
-  "name": "monkeyd-bryan-bot",
+  "name": "monkey-d-bryan",
   "version": "1.0.0",
-  "description": "Bot de segurança Monkey D' Bryan com AutoMod, logs e avaliação de perfis",
+  "description": "Bot de segurança completo com AutoMod, mute, avaliação de perfil e comandos slash",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
+  "keywords": [
+    "discord",
+    "bot",
+    "security",
+    "automod",
+    "logs",
+    "mute"
+  ],
+  "author": "Bryan",
+  "license": "MIT",
   "dependencies": {
-    "discord.js": "^14.16.0",
-    "mongoose": "^7.6.0"
+    "discord.js": "^14.12.1",
+    "mongoose": "^7.7.1",
+    "@discordjs/rest": "^1.5.0",
+    "discord-api-types": "^0.37.43"
   },
   "engines": {
     "node": ">=18.0.0"

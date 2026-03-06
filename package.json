@@ -1,6 +1,6 @@
 {
   "name": "monkey-d-bryan",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "description": "Bot completo de segurança Discord com AutoMod avançado, Anti-Raid, avaliação detalhada de perfis, comparação de contas e comandos administrativos",
   "main": "index.js",
   "scripts": {
@@ -16,7 +16,9 @@
     "mute",
     "profile",
     "compare",
-    "antiraid"
+    "antiraid",
+    "evaluation",
+    "slashcommands"
   ],
   "author": "Bryan",
   "license": "MIT",

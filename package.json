@@ -1,15 +1,11 @@
 {
-  "name": "role-monitor-bot",
+  "name": "cargo-monitor",
   "version": "1.0.0",
-  "description": "Bot para monitorar cargos e responder menções",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "discord.js": "^14.14.1"
-  },
-  "engines": {
-    "node": ">=18"
   }
 }

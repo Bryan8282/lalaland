@@ -1,6 +1,6 @@
-// ================= Monkey D' Bryan - INDEX COMPLETO =================
+// ================= Monkey D' Bryan - INDEX BLOCO 1 =================
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionsBitField, Collection, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
-const { TOKEN, LOG_CHANNEL_ID } = require('./monkey_d_bryan.json');
+const { LOG_CHANNEL_ID } = require('./monkey_d_bryan.json');
 
 const client = new Client({
   intents: [
@@ -12,11 +12,14 @@ const client = new Client({
   partials: [Partials.Channel]
 });
 
+// ----------------- TOKEN VIA ENV -----------------
+const TOKEN = process.env.TOKEN;
+
 // ----------------- COLLECTIONS -----------------
 client.commands = new Collection();
-client.mutes = new Collection(); // userId => timestamp do fim do mute
-client.warns = new Collection(); // userId => quantidade de warns
-client.xp = new Collection();    // userId => XP
+client.mutes = new Collection();
+client.warns = new Collection();
+client.xp = new Collection();
 
 // ----------------- FUNÇÕES AUXILIARES -----------------
 function sendLog(guild, message){
@@ -47,6 +50,7 @@ client.on("guildMemberAdd", async member => {
     await member.send(`🚨 Sua conta foi avaliada!\nNota de risco: ${risk}/100\n${createBar(risk,100)}`); 
   } catch(err){ console.log(`❌ Não foi possível enviar PV para ${member.user.tag}`); }
 });
+
 // ----------------- REPLY AO SER MENCIONADO -----------------
 client.on("messageCreate", message => {
   if(message.author.bot) return;
@@ -56,7 +60,7 @@ client.on("messageCreate", message => {
 // ----------------- AUTO MOD / ANTIRAID -----------------
 client.on("messageCreate", async message => {
   if(message.author.bot) return;
-  const forbiddenWords = ["palavra1","palavra2"]; // adicione palavras proibidas
+  const forbiddenWords = ["palavra1","palavra2"];
   const linksBlocked = ["discord.gg","bit.ly","tinyurl.com"];
   let deleted = false;
 
@@ -76,8 +80,142 @@ client.on("messageCreate", async message => {
 
   if(deleted) sendLog(message.guild, `Mensagem de ${message.author.tag} deletada pelo AutoMod.`);
 });
+const { SlashCommandBuilder } = require('discord.js');
 
-// ----------------- MODERAÇÃO / BOTÕES -----------------
+// ----------------- HELP -----------------
+client.commands.set('help', {
+  data: new SlashCommandBuilder()
+    .setName('help')
+    .setDescription('Lista todos os comandos disponíveis'),
+  execute: async (interaction) => {
+    const cmds = Array.from(client.commands.keys()).join('\n• ');
+    const embed = new EmbedBuilder()
+      .setTitle('📜 Comandos Disponíveis')
+      .setDescription(`• ${cmds}`)
+      .setColor("Blue")
+      .setTimestamp();
+    await interaction.reply({ embeds:[embed], ephemeral:true });
+  }
+});
+
+// ----------------- PROFILE -----------------
+client.commands.set('profile', {
+  data: new SlashCommandBuilder()
+    .setName('profile')
+    .setDescription('Avalia o perfil de um usuário')
+    .addUserOption(opt => opt.setName('user').setDescription('Usuário a avaliar')),
+  execute: async (interaction) => {
+    const user = interaction.options.getUser('user') || interaction.user;
+    const risk = calculateRisk(user);
+    const embed = new EmbedBuilder()
+      .setTitle(`📊 Avaliação de Perfil: ${user.tag}`)
+      .setDescription(`Nota de risco: ${risk}/100\n${createBar(risk,100)}\nID: ${user.id}`)
+      .setColor(risk > 60 ? "Red" : risk > 30 ? "Yellow" : "Green")
+      .setTimestamp();
+    sendLog(interaction.guild, `Usuário avaliado: ${user.tag}, risco: ${risk}`);
+    await interaction.reply({ embeds:[embed] });
+  }
+});
+
+// ----------------- COMPARE -----------------
+client.commands.set('compare', {
+  data: new SlashCommandBuilder()
+    .setName('compare')
+    .setDescription('Compara duas contas e mostra pontos em comum')
+    .addUserOption(opt => opt.setName('user1').setDescription('Primeira conta').setRequired(true))
+    .addUserOption(opt => opt.setName('user2').setDescription('Segunda conta').setRequired(true)),
+  execute: async (interaction) => {
+    const user1 = interaction.options.getUser('user1');
+    const user2 = interaction.options.getUser('user2');
+    // Aqui podemos comparar XP, warns, mutes ou outros dados que temos
+    const common = [];
+    if(client.mutes.has(user1.id) && client.mutes.has(user2.id)) common.push("Ambos estão mutados");
+    if(client.warns.get(user1.id) && client.warns.get(user2.id)) common.push("Ambos têm warns");
+    const embed = new EmbedBuilder()
+      .setTitle(`🔍 Comparação: ${user1.tag} vs ${user2.tag}`)
+      .setDescription(common.length ? common.join("\n") : "Nenhum ponto em comum encontrado")
+      .setColor("Purple")
+      .setTimestamp();
+    await interaction.reply({ embeds:[embed] });
+  }
+});
+
+// ----------------- MUTE LIST -----------------
+client.commands.set('mutelist', {
+  data: new SlashCommandBuilder()
+    .setName('mutelist')
+    .setDescription('Mostra ranking de mutes'),
+  execute: async (interaction) => {
+    let desc = '';
+    client.mutes.forEach((v,k) => { desc += `<@${k}> - Mutado até ${new Date(v).toLocaleString()}\n`; });
+    if(!desc) desc = "Nenhum usuário mutado.";
+    const embed = new EmbedBuilder()
+      .setTitle('🔇 Ranking de Mutes')
+      .setDescription(desc)
+      .setColor("Orange")
+      .setTimestamp();
+    await interaction.reply({ embeds:[embed] });
+  }
+});
+
+// ----------------- WARN LIST -----------------
+client.commands.set('warnlist', {
+  data: new SlashCommandBuilder()
+    .setName('warnlist')
+    .setDescription('Mostra ranking de warns'),
+  execute: async (interaction) => {
+    let desc = '';
+    client.warns.forEach((v,k) => { desc += `<@${k}> - ${v} warns\n`; });
+    if(!desc) desc = "Nenhum usuário com warns.";
+    const embed = new EmbedBuilder()
+      .setTitle('⚠ Ranking de Warns')
+      .setDescription(desc)
+      .setColor("Yellow")
+      .setTimestamp();
+    await interaction.reply({ embeds:[embed] });
+  }
+});
+
+// ----------------- RANK -----------------
+client.commands.set('rank', {
+  data: new SlashCommandBuilder()
+    .setName('rank')
+    .setDescription('Mostra ranking de XP'),
+  execute: async (interaction) => {
+    let desc = '';
+    const sorted = Array.from(client.xp.entries()).sort((a,b)=>b[1]-a[1]);
+    sorted.forEach(([id, xp], i) => { desc += `${i+1}. <@${id}> - ${xp} XP\n`; });
+    if(!desc) desc = "Nenhum usuário com XP registrado.";
+    const embed = new EmbedBuilder()
+      .setTitle('🏆 Ranking de XP')
+      .setDescription(desc)
+      .setColor("Green")
+      .setTimestamp();
+    await interaction.reply({ embeds:[embed] });
+  }
+});
+
+// ----------------- CREATE CHANNEL -----------------
+client.commands.set('createchannel', {
+  data: new SlashCommandBuilder()
+    .setName('createchannel')
+    .setDescription('Cria um canal de texto ou voz')
+    .addStringOption(opt => opt.setName('name').setDescription('Nome do canal').setRequired(true))
+    .addStringOption(opt => opt.setName('type').setDescription('Tipo: text ou voice').setRequired(true))
+    .addBooleanOption(opt => opt.setName('private').setDescription('Privado?').setRequired(false))
+    .addStringOption(opt => opt.setName('category').setDescription('ID da categoria').setRequired(false)),
+  execute: async (interaction) => {
+    const name = interaction.options.getString('name');
+    const type = interaction.options.getString('type') === 'voice' ? ChannelType.GuildVoice : ChannelType.GuildText;
+    const isPrivate = interaction.options.getBoolean('private') || false;
+    const category = interaction.options.getString('category') || null;
+    const perms = isPrivate ? [{ id: interaction.guild.id, deny: [PermissionsBitField.Flags.ViewChannel] }] : [];
+    const channel = await interaction.guild.channels.create({ name, type, parent: category || undefined, permissionOverwrites: perms }).catch(()=>null);
+    if(channel) interaction.reply({ content:`✅ Canal ${name} criado!`, ephemeral:true });
+    else interaction.reply({ content:"❌ Não foi possível criar o canal.", ephemeral:true });
+  }
+});
+// ================= MODERAÇÃO / BOTÕES ==================
 async function modAction(interaction, type){
   const target = interaction.options.getUser("user");
   if(!target) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
@@ -96,7 +234,7 @@ async function modAction(interaction, type){
   await interaction.reply({ embeds:[embed], components:[row], ephemeral:true });
 }
 
-// ----------------- EXECUTANDO AÇÃO COM BOTÃO -----------------
+// ----------------- BOTÃO DE CONFIRMAÇÃO -----------------
 client.on('interactionCreate', async interaction => {
   if(!interaction.isButton()) return;
   const [action, type, userId] = interaction.customId.split('_');
@@ -116,152 +254,68 @@ client.on('interactionCreate', async interaction => {
       interaction.update({ content:`✅ Ban realizado!`, components:[], embeds:[] });
       break;
     case "mute":
-      const muteTime = 10*60*1000; // 10 minutos como exemplo
+      const muteTime = 10*60*1000;
       client.mutes.set(userId, Date.now()+muteTime);
       sendLog(interaction.guild, `🔇 ${member.user.tag} foi mutado por 10 minutos.`);
       interaction.update({ content:`✅ Mute realizado!`, components:[], embeds:[] });
       break;
   }
 });
-// ----------------- COMANDOS SLASH -----------------
-client.commands.set('help', { execute: async (interaction) => {
-  const embed = new EmbedBuilder()
-    .setTitle("📜 Lista de Comandos")
-    .setDescription(
-      "/help, /profile, /compare, /mute, /unmute, /warn, /kick, /ban, /mutelist, /warnlist, /rank, /createchannel"
-    )
-    .setColor("Blue");
-  await interaction.reply({ embeds:[embed], ephemeral:true });
-}});
 
-client.commands.set('profile', { execute: async (interaction) => {
-  const user = interaction.options.getUser("user") || interaction.user;
-  const risk = calculateRisk(user);
-  const embed = new EmbedBuilder()
-    .setTitle(`📋 Perfil de ${user.tag}`)
-    .setDescription(`🆔 ID: ${user.id}\n📊 Risco: ${risk}/100\n${createBar(risk,100)}\nWarns: ${client.warns.get(user.id)||0}\nMutes: ${client.mutes.get(user.id)||0}`)
-    .setColor("Green")
-    .setTimestamp();
-  await interaction.reply({ embeds:[embed], ephemeral:true });
-}});
-
-client.commands.set('compare', { execute: async (interaction) => {
-  const user1 = interaction.options.getUser("user1");
-  const user2 = interaction.options.getUser("user2");
-  if(!user1 || !user2) return interaction.reply({ content:"❌ Usuários não encontrados", ephemeral:true });
-  const commonWarns = Math.min(client.warns.get(user1.id)||0, client.warns.get(user2.id)||0);
-  const commonMutes = Math.min(client.mutes.get(user1.id)||0, client.mutes.get(user2.id)||0);
-  const embed = new EmbedBuilder()
-    .setTitle(`🔎 Comparação entre ${user1.tag} e ${user2.tag}`)
-    .setDescription(`⚠ Warns em comum: ${commonWarns}\n🔇 Mutes em comum: ${commonMutes}`)
-    .setColor("Purple")
-    .setTimestamp();
-  await interaction.reply({ embeds:[embed], ephemeral:true });
-}});
-
-client.commands.set('mutelist', { execute: async (interaction) => {
-  const embed = new EmbedBuilder().setTitle("🔇 Rank de Mutes").setColor("Orange");
-  let description = "";
-  Array.from(client.mutes.entries()).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([id,value],i)=>{
-    description += `\`${i+1}\` <@${id}>: ${value}\n`;
-  });
-  embed.setDescription(description || "Sem dados");
-  await interaction.reply({ embeds:[embed], ephemeral:true });
-}});
-
-client.commands.set('warnlist', { execute: async (interaction) => {
-  const embed = new EmbedBuilder().setTitle("⚠ Rank de Warns").setColor("Yellow");
-  let description = "";
-  Array.from(client.warns.entries()).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([id,value],i)=>{
-    description += `\`${i+1}\` <@${id}>: ${value}\n`;
-  });
-  embed.setDescription(description || "Sem dados");
-  await interaction.reply({ embeds:[embed], ephemeral:true });
-}});
-
-client.commands.set('rank', { execute: async (interaction) => {
-  const embed = new EmbedBuilder().setTitle("🏆 Rank de XP").setColor("Gold");
-  let description = "";
-  Array.from(client.xp.entries()).sort((a,b)=>b[1]-a[1]).slice(0,10).forEach(([id,value],i)=>{
-    description += `\`${i+1}\` <@${id}>: ${value} XP\n`;
-  });
-  embed.setDescription(description || "Sem dados");
-  await interaction.reply({ embeds:[embed], ephemeral:true });
-}});
-
-client.commands.set('createchannel', { execute: async (interaction) => {
-  const name = interaction.options.getString("name");
-  const typeStr = interaction.options.getString("type").toLowerCase();
-  const isPrivate = interaction.options.getBoolean("private") || false;
-  const category = interaction.options.getChannel("category");
-  const type = typeStr === "voice" ? ChannelType.GuildVoice : ChannelType.GuildText;
-  const options = { type, topic: type===ChannelType.GuildText ? "Criado pelo Monkey D' Bryan" : undefined };
-  if(category) options.parent = category.id;
-  if(isPrivate){
-    options.permissionOverwrites = [
-      { id: interaction.guild.roles.everyone.id, deny: [PermissionsBitField.Flags.ViewChannel] },
-      { id: interaction.user.id, allow: [PermissionsBitField.Flags.ViewChannel, PermissionsBitField.Flags.SendMessages, PermissionsBitField.Flags.Connect, PermissionsBitField.Flags.Speak] }
-    ];
+// ----------------- COMANDOS DE MODERAÇÃO -----------------
+// /mute
+client.commands.set('mute', {
+  data: new SlashCommandBuilder()
+    .setName('mute')
+    .setDescription('Mutar um usuário')
+    .addUserOption(opt => opt.setName('user').setDescription('Usuário a mutar').setRequired(true)),
+  execute: async interaction => modAction(interaction,'mute')
+});
+// /unmute
+client.commands.set('unmute', {
+  data: new SlashCommandBuilder()
+    .setName('unmute')
+    .setDescription('Desmutar um usuário')
+    .addUserOption(opt => opt.setName('user').setDescription('Usuário a desmutar').setRequired(true)),
+  execute: async interaction => {
+    const target = interaction.options.getUser('user');
+    if(client.mutes.has(target.id)){
+      client.mutes.delete(target.id);
+      sendLog(interaction.guild, `🔊 ${target.tag} foi desmutado.`);
+      interaction.reply({ content:`✅ ${target.tag} desmutado!`, ephemeral:true });
+    } else interaction.reply({ content:`❌ ${target.tag} não estava mutado.`, ephemeral:true });
   }
-  try{
-    const channel = await interaction.guild.channels.create({ name, ...options });
-    await interaction.reply({ content:`✅ Canal criado: ${channel}`, ephemeral:true });
-    sendLog(interaction.guild, `${interaction.user.tag} criou o canal ${channel.name}`);
-  } catch(err){ console.error(err); await interaction.reply({ content:"❌ Erro ao criar o canal", ephemeral:true }); }
-}});
-// ----------------- COMANDOS DE MODERAÇÃO FUNCIONAIS -----------------
-client.commands.set('mute', { execute: async (interaction) => {
-  const user = interaction.options.getUser("user");
-  if(!user) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
-  const time = interaction.options.getInteger("time") || 10; // minutos
-  client.mutes.set(user.id, Date.now() + time*60*1000);
-  sendLog(interaction.guild, `🔇 ${user.tag} foi mutado por ${time} minutos.`);
-  try { await user.send(`Você foi mutado por ${time} minutos.`); } catch{}
-  await interaction.reply({ content:`✅ Usuário ${user.tag} mutado por ${time} minutos.`, ephemeral:true });
-}});
-
-client.commands.set('unmute', { execute: async (interaction) => {
-  const user = interaction.options.getUser("user");
-  if(!user) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
-  client.mutes.delete(user.id);
-  sendLog(interaction.guild, `🔊 ${user.tag} foi desmutado.`);
-  try { await user.send(`Você foi desmutado.`); } catch{}
-  await interaction.reply({ content:`✅ Usuário ${user.tag} desmutado.`, ephemeral:true });
-}});
-
-client.commands.set('warn', { execute: async (interaction) => {
-  const user = interaction.options.getUser("user");
-  if(!user) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
-  const current = client.warns.get(user.id) || 0;
-  client.warns.set(user.id, current + 1);
-  sendLog(interaction.guild, `⚠ ${user.tag} recebeu um warn. Total: ${current+1}`);
-  try { await user.send(`Você recebeu um warn. Total: ${current+1}`); } catch{}
-  await interaction.reply({ content:`✅ Usuário ${user.tag} recebeu um warn.`, ephemeral:true });
-}});
-
-client.commands.set('kick', { execute: async (interaction) => {
-  const user = interaction.options.getUser("user");
-  if(!user) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
-  const member = interaction.guild.members.cache.get(user.id);
-  if(!member) return interaction.reply({ content:"❌ Membro não encontrado no servidor", ephemeral:true });
-  await member.kick("Kick via comando").catch(()=>{});
-  sendLog(interaction.guild, `👢 ${user.tag} foi kickado.`);
-  await interaction.reply({ content:`✅ Usuário ${user.tag} kickado.`, ephemeral:true });
-}});
-
-client.commands.set('ban', { execute: async (interaction) => {
-  const user = interaction.options.getUser("user");
-  if(!user) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
-  const member = interaction.guild.members.cache.get(user.id);
-  if(!member) return interaction.reply({ content:"❌ Membro não encontrado no servidor", ephemeral:true });
-  await member.ban({ reason: "Ban via comando" }).catch(()=>{});
-  sendLog(interaction.guild, `🔨 ${user.tag} foi banido.`);
-  await interaction.reply({ content:`✅ Usuário ${user.tag} banido.`, ephemeral:true });
-}});
+});
+// /warn
+client.commands.set('warn', {
+  data: new SlashCommandBuilder()
+    .setName('warn')
+    .setDescription('Adicionar warn a um usuário')
+    .addUserOption(opt => opt.setName('user').setDescription('Usuário a warnar').setRequired(true)),
+  execute: async interaction => {
+    const user = interaction.options.getUser('user');
+    const warns = client.warns.get(user.id) || 0;
+    client.warns.set(user.id, warns+1);
+    sendLog(interaction.guild, `⚠ ${user.tag} recebeu warn. Total: ${warns+1}`);
+    interaction.reply({ content:`✅ ${user.tag} agora tem ${warns+1} warns.`, ephemeral:true });
+  }
+});
+// /kick
+client.commands.set('kick', {
+  data: new SlashCommandBuilder()
+    .setName('kick')
+    .setDescription('Kickar um usuário')
+    .addUserOption(opt => opt.setName('user').setDescription('Usuário a kickar').setRequired(true)),
+  execute: async interaction => modAction(interaction,'kick')
+});
+// /ban
+client.commands.set('ban', {
+  data: new SlashCommandBuilder()
+    .setName('ban')
+    .setDescription('Banir um usuário')
+    .addUserOption(opt => opt.setName('user').setDescription('Usuário a banir').setRequired(true)),
+  execute: async interaction => modAction(interaction,'ban')
+});
 
 // ----------------- LOGIN DO BOT -----------------
 client.login(TOKEN).catch(err => console.error("🚨 Erro ao logar o bot:",err));
-
-// =====================================================================
-// ESTE INDEX.JS É 100% FINAL, COM TODAS FUNÇÕES PLANEJADAS.
-// =====================================================================

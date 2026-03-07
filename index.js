@@ -1,13 +1,11 @@
-const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionsBitField, Collection, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
+const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const config = require('./config.json');
 
 // ----------------- CLIENT -----------------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
+    GatewayIntentBits.GuildMembers
   ],
   partials: [Partials.Channel]
 });
@@ -15,291 +13,21 @@ const client = new Client({
 // ----------------- TOKEN -----------------
 const TOKEN = process.env.TOKEN;
 
-// ----------------- COLLECTIONS -----------------
-client.commands = new Collection();
-client.mutes = new Collection();
-client.warns = new Collection();
-client.xp = new Collection();
-
-// ----------------- CATCH GLOBAL DE ERROS -----------------
-process.on('unhandledRejection', err => console.error('❌ Unhandled Rejection:', err));
-process.on('uncaughtException', err => console.error('❌ Uncaught Exception:', err));
-
-// ----------------- READY -----------------
-client.on('ready', () => {
-  console.log(`✅ Bot online como ${client.user.tag}`);
-});
-
-// ----------------- FUNÇÕES AUXILIARES -----------------
-function sendLog(guild, message){
-  const logChannel = guild.channels.cache.get(config.LOG_CHANNEL_ID);
-  if(logChannel) logChannel.send({ embeds:[ new EmbedBuilder().setDescription(message).setColor("Grey") ] });
-}
-
-function calculateRisk(user){
-  return Math.floor(Math.random() * 101);
-}
-
-function createBar(value,max){
-  const full = "█".repeat(Math.floor((value/max)*10));
-  const empty = "░".repeat(10 - full.length);
-  return full + empty;
-}
-
-// ----------------- EVENTO: NOVO MEMBRO -----------------
-client.on("guildMemberAdd", async member => {
-  const risk = calculateRisk(member.user);
-  const embed = new EmbedBuilder()
-    .setTitle(`🆕 Novo membro avaliado: ${member.user.tag}`)
-    .setDescription(`📊 Nota de risco: ${risk}/100\n${createBar(risk,100)}\n🆔 ID: ${member.user.id}`)
-    .setColor(risk > 60 ? "Red" : risk > 30 ? "Yellow" : "Green")
-    .setTimestamp();
-  sendLog(member.guild, embed.description);
-  try { 
-    await member.send(`🚨 Sua conta foi avaliada!\nNota de risco: ${risk}/100\n${createBar(risk,100)}`); 
-  } catch(err){ console.log(`❌ Não foi possível enviar PV para ${member.user.tag}`); }
-});
-
-// ----------------- REPLY AO SER MENCIONADO -----------------
-client.on("messageCreate", message => {
-  if(message.author.bot) return;
-  if(message.mentions.has(client.user)) message.reply("shut up nigga");
-});
-
-// ----------------- AUTO MOD / ANTIRAID -----------------
-client.on("messageCreate", async message => {
-  if(message.author.bot) return;
-  const forbiddenWords = config.AUTO_MOD.BLOCKED_WORDS;
-  const linksBlocked = config.AUTO_MOD.BLOCKED_LINKS;
-  let deleted = false;
-
-  forbiddenWords.forEach(word => { 
-    if(message.content.toLowerCase().includes(word)){ 
-      message.delete().catch(()=>{}); 
-      deleted = true; 
-    } 
-  });
-
-  linksBlocked.forEach(link => { 
-    if(message.content.includes(link)){ 
-      message.delete().catch(()=>{}); 
-      deleted = true; 
-    } 
-  });
-
-  if(deleted) sendLog(message.guild, `Mensagem de ${message.author.tag} deletada pelo AutoMod.`);
-});
-// ================== COMANDOS SLASH ==================
-
-// ----------------- HELP -----------------
-client.commands.set('help', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('help')
-    .setDescription('Lista todos os comandos do bot'),
-  execute: async interaction => {
-    const embed = new EmbedBuilder()
-      .setTitle("📜 Lista de Comandos")
-      .setColor(config.EMBED.COLOR.INFO)
-      .setDescription(`
-/help - Lista todos os comandos
-/profile - Avaliação de perfil
-/compare - Comparar duas contas
-/mutelist - Rank de mutes
-/warnlist - Rank de warns
-/rank - XP dos usuários
-/createchannel - Criar canal de texto ou voz
-/mute - Mutar usuário
-/unmute - Desmutar usuário
-/warn - Adicionar warn
-/kick - Kickar usuário
-/ban - Banir usuário
-    `);
-    interaction.reply({ embeds:[embed], ephemeral:true });
+// ----------------- LOGS DE CARGO -----------------
+client.on('guildMemberAdd', member => {
+  if(member.roles.cache.has(config.TARGET_ROLE_ID)){
+    const channel = member.guild.channels.cache.get(config.LOG_CHANNEL_ID);
+    if(channel) channel.send(`🟢 <@${member.id}> entrou no servidor com o cargo <@&${config.TARGET_ROLE_ID}>.`);
   }
 });
 
-// ----------------- PROFILE -----------------
-client.commands.set('profile', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('profile')
-    .setDescription('Avaliar o perfil de um usuário')
-    .addUserOption(opt => opt.setName('user').setDescription('Usuário a avaliar').setRequired(false)),
-  execute: async interaction => {
-    const user = interaction.options.getUser('user') || interaction.user;
-    const risk = calculateRisk(user);
-    const embed = new EmbedBuilder()
-      .setTitle(`📊 Avaliação de ${user.tag}`)
-      .setDescription(`Nota de risco: ${risk}/100\n${createBar(risk,100)}\nID: ${user.id}`)
-      .setColor(risk>60?"Red":risk>30?"Yellow":"Green")
-      .setTimestamp();
-    interaction.reply({ embeds:[embed] });
+client.on('guildMemberRemove', member => {
+  if(member.roles.cache.has(config.TARGET_ROLE_ID)){
+    const channel = member.guild.channels.cache.get(config.LOG_CHANNEL_ID);
+    if(channel) channel.send(`🔴 <@${member.id}> saiu do servidor com o cargo <@&${config.TARGET_ROLE_ID}>.`);
   }
 });
 
-// ----------------- COMPARE -----------------
-client.commands.set('compare', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('compare')
-    .setDescription('Comparar duas contas')
-    .addUserOption(opt => opt.setName('user1').setDescription('Primeiro usuário').setRequired(true))
-    .addUserOption(opt => opt.setName('user2').setDescription('Segundo usuário').setRequired(true)),
-  execute: async interaction => {
-    const u1 = interaction.options.getUser('user1');
-    const u2 = interaction.options.getUser('user2');
-    const common = ["risco","xp","warns"].map(f => `${f}: ${Math.floor(Math.random()*100)}`).join("\n");
-    const embed = new EmbedBuilder()
-      .setTitle(`🤝 Comparação: ${u1.tag} x ${u2.tag}`)
-      .setDescription(common)
-      .setColor("Purple")
-      .setTimestamp();
-    interaction.reply({ embeds:[embed] });
-  }
-});
-
-// ----------------- CREATECHANNEL -----------------
-client.commands.set('createchannel', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('createchannel')
-    .setDescription('Cria um canal de texto ou voz')
-    .addStringOption(opt => opt.setName('name').setDescription('Nome do canal').setRequired(true))
-    .addStringOption(opt => opt.setName('type').setDescription('Tipo: text ou voice').setRequired(true))
-    .addBooleanOption(opt => opt.setName('private').setDescription('Canal privado?').setRequired(false))
-    .addStringOption(opt => opt.setName('category').setDescription('Categoria (opcional)').setRequired(false)),
-  execute: async interaction => {
-    const name = interaction.options.getString('name');
-    const type = interaction.options.getString('type');
-    const isPrivate = interaction.options.getBoolean('private') || false;
-    const categoryName = interaction.options.getString('category');
-    let parent = null;
-
-    if(categoryName){
-      const cat = interaction.guild.channels.cache.find(c=>c.name===categoryName && c.type===ChannelType.GuildCategory);
-      if(cat) parent = cat.id;
-    }
-
-    const chType = type.toLowerCase() === "voice" ? ChannelType.GuildVoice : ChannelType.GuildText;
-    const perms = isPrivate ? [{id: interaction.guild.id, deny:[PermissionsBitField.Flags.ViewChannel]}] : [];
-
-    interaction.guild.channels.create({ name, type:chType, parent, permissionOverwrites:perms })
-      .then(ch => interaction.reply({ content:`✅ Canal criado: ${ch}`, ephemeral:true }))
-      .catch(err => interaction.reply({ content:`❌ Erro ao criar canal: ${err}`, ephemeral:true }));
-  }
-});
-
-// ----------------- MUTELIST -----------------
-client.commands.set('mutelist', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('mutelist')
-    .setDescription('Mostra rank de mutes'),
-  execute: async interaction => {
-    const sorted = [...client.mutes.entries()].sort((a,b)=>b[1]-a[1]).map(([id,time],i)=>`${i+1}. <@${id}> - Expira em ${Math.floor((time-Date.now())/1000/60)}m`);
-    const embed = new EmbedBuilder()
-      .setTitle("🔇 Rank de Mutes")
-      .setDescription(sorted.join("\n") || "Nenhum mute ativo")
-      .setColor(config.EMBED.COLOR.WARN);
-    interaction.reply({ embeds:[embed], ephemeral:true });
-  }
-});
-// ================== MODERAÇÃO / BOTÕES ==================
-async function modAction(interaction, type){
-  const target = interaction.options.getUser("user");
-  if(!target) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
-  const member = interaction.guild.members.cache.get(target.id);
-  const embed = new EmbedBuilder().setColor(config.EMBED.COLOR.ERROR).setTimestamp();
-  const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId(`confirm_${type}_${target.id}`).setLabel("Confirmar").setStyle(ButtonStyle.Danger)
-  );
-
-  switch(type){
-    case "kick": embed.setTitle("👢 Kick").setDescription(`Deseja kickar ${target.tag}?`); break;
-    case "ban": embed.setTitle("🔨 Ban").setDescription(`Deseja banir ${target.tag}?`); break;
-    case "mute": embed.setTitle("🔇 Mute").setDescription(`Deseja mutar ${target.tag}?`); break;
-  }
-
-  await interaction.reply({ embeds:[embed], components:[row], ephemeral:true });
-}
-
-// ----------------- BOTÃO DE CONFIRMAÇÃO -----------------
-client.on('interactionCreate', async interaction => {
-  if(!interaction.isButton()) return;
-  const [action, type, userId] = interaction.customId.split('_');
-  if(action !== "confirm") return;
-  const member = interaction.guild.members.cache.get(userId);
-  if(!member) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
-
-  switch(type){
-    case "kick":
-      await member.kick("Kick confirmado pelo botão").catch(()=>{});
-      sendLog(interaction.guild, `👢 ${member.user.tag} foi kickado.`);
-      interaction.update({ content:`✅ Kick realizado!`, components:[], embeds:[] });
-      break;
-    case "ban":
-      await member.ban({ reason: "Ban confirmado pelo botão" }).catch(()=>{});
-      sendLog(interaction.guild, `🔨 ${member.user.tag} foi banido.`);
-      interaction.update({ content:`✅ Ban realizado!`, components:[], embeds:[] });
-      break;
-    case "mute":
-      const muteTime = config.MUTE.DEFAULT_DURATION_MINUTES*60*1000;
-      client.mutes.set(userId, Date.now()+muteTime);
-      sendLog(interaction.guild, `🔇 ${member.user.tag} foi mutado por ${config.MUTE.DEFAULT_DURATION_MINUTES} minutos.`);
-      interaction.update({ content:`✅ Mute realizado!`, components:[], embeds:[] });
-      break;
-  }
-});
-
-// ----------------- COMANDOS DE MODERAÇÃO -----------------
-client.commands.set('mute', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('mute')
-    .setDescription('Mutar um usuário')
-    .addUserOption(opt => opt.setName('user').setDescription('Usuário a mutar').setRequired(true)),
-  execute: async interaction => modAction(interaction,'mute')
-});
-
-client.commands.set('unmute', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('unmute')
-    .setDescription('Desmutar um usuário')
-    .addUserOption(opt => opt.setName('user').setDescription('Usuário a desmutar').setRequired(true)),
-  execute: async interaction => {
-    const target = interaction.options.getUser('user');
-    if(client.mutes.has(target.id)){
-      client.mutes.delete(target.id);
-      sendLog(interaction.guild, `🔊 ${target.tag} foi desmutado.`);
-      interaction.reply({ content:`✅ ${target.tag} desmutado!`, ephemeral:true });
-    } else interaction.reply({ content:`❌ ${target.tag} não estava mutado.`, ephemeral:true });
-  }
-});
-
-client.commands.set('warn', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('warn')
-    .setDescription('Adicionar warn a um usuário')
-    .addUserOption(opt => opt.setName('user').setDescription('Usuário a warnar').setRequired(true)),
-  execute: async interaction => {
-    const user = interaction.options.getUser('user');
-    const warns = client.warns.get(user.id) || 0;
-    client.warns.set(user.id, warns+1);
-    sendLog(interaction.guild, `⚠ ${user.tag} recebeu warn. Total: ${warns+1}`);
-    interaction.reply({ content:`✅ ${user.tag} agora tem ${warns+1} warns.`, ephemeral:true });
-  }
-});
-
-client.commands.set('kick', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('kick')
-    .setDescription('Kickar um usuário')
-    .addUserOption(opt => opt.setName('user').setDescription('Usuário a kickar').setRequired(true)),
-  execute: async interaction => modAction(interaction,'kick')
-});
-
-client.commands.set('ban', {
-  data: new (require('discord.js').SlashCommandBuilder)()
-    .setName('ban')
-    .setDescription('Banir um usuário')
-    .addUserOption(opt => opt.setName('user').setDescription('Usuário a banir').setRequired(true)),
-  execute: async interaction => modAction(interaction,'ban')
-});
-
-// ----------------- LOGIN FINAL -----------------
-client.login(TOKEN).catch(err => console.error("🚨 Erro ao logar o bot:",err));
+// ----------------- LOGIN -----------------
+client.login(TOKEN).then(() => console.log(`✅ Bot online como ${client.user.tag}`))
+.catch(err => console.error('❌ Erro ao logar o bot:', err));

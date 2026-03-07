@@ -1,5 +1,38 @@
 {
   "LOG_CHANNEL_ID": "1479521982356652194",
+  "AUTO_MOD": {
+    "BLOCKED_WORDS": ["palavra1","palavra2"],
+    "BLOCKED_LINKS": ["discord.gg","bit.ly","tinyurl.com"]
+  },
+  "MUTE": {
+    "DEFAULT_DURATION_MINUTES": 10
+  },
+  "EMBED": {
+    "COLOR": {
+      "INFO": "Blue",
+      "WARN": "Orange",
+      "ERROR": "Red",
+      "SUCCESS": "Green"
+    }
+  },
+  "XP": {
+    "ENABLE": true
+  },
+  "COMMANDS": {
+    "ENABLE": true
+  },
+  "PROFILE": {
+    "ENABLE": true
+  },
+  "COMPARE": {
+    "ENABLE": true
+  },
+  "CREATE_CHANNEL": {
+    "ENABLE": true
+  },
+  "MODERATION": {
+    "ENABLE": true
+  },
   "INTENTS": [
     "Guilds",
     "GuildMembers",

@@ -1,5 +1,11 @@
 {
-  "LOG_CHANNEL_ID": "1350550462218113044",
-  "TARGET_ROLE_ID": "1479667422679138444",
-  "NOTIFY_USER_ID": "1465203429864374476"
+  "name": "role-monitor-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1"
+  }
 }

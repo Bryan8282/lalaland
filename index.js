@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, Partials, EmbedBuilder, PermissionsBitField, Collection, ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType } = require('discord.js');
-const { LOG_CHANNEL_ID } = require('./monkey_d_bryan.json');
+const config = require('./config.json');
 
 // ----------------- CLIENT -----------------
 const client = new Client({
@@ -32,7 +32,7 @@ client.on('ready', () => {
 
 // ----------------- FUNÇÕES AUXILIARES -----------------
 function sendLog(guild, message){
-  const logChannel = guild.channels.cache.get(LOG_CHANNEL_ID);
+  const logChannel = guild.channels.cache.get(config.LOG_CHANNEL_ID);
   if(logChannel) logChannel.send({ embeds:[ new EmbedBuilder().setDescription(message).setColor("Grey") ] });
 }
 
@@ -69,8 +69,8 @@ client.on("messageCreate", message => {
 // ----------------- AUTO MOD / ANTIRAID -----------------
 client.on("messageCreate", async message => {
   if(message.author.bot) return;
-  const forbiddenWords = ["palavra1","palavra2"];
-  const linksBlocked = ["discord.gg","bit.ly","tinyurl.com"];
+  const forbiddenWords = config.AUTO_MOD.BLOCKED_WORDS;
+  const linksBlocked = config.AUTO_MOD.BLOCKED_LINKS;
   let deleted = false;
 
   forbiddenWords.forEach(word => { 
@@ -99,7 +99,7 @@ client.commands.set('help', {
   execute: async interaction => {
     const embed = new EmbedBuilder()
       .setTitle("📜 Lista de Comandos")
-      .setColor("Blue")
+      .setColor(config.EMBED.COLOR.INFO)
       .setDescription(`
 /help - Lista todos os comandos
 /profile - Avaliação de perfil
@@ -196,7 +196,7 @@ client.commands.set('mutelist', {
     const embed = new EmbedBuilder()
       .setTitle("🔇 Rank de Mutes")
       .setDescription(sorted.join("\n") || "Nenhum mute ativo")
-      .setColor("Orange");
+      .setColor(config.EMBED.COLOR.WARN);
     interaction.reply({ embeds:[embed], ephemeral:true });
   }
 });
@@ -205,7 +205,7 @@ async function modAction(interaction, type){
   const target = interaction.options.getUser("user");
   if(!target) return interaction.reply({ content:"❌ Usuário não encontrado", ephemeral:true });
   const member = interaction.guild.members.cache.get(target.id);
-  const embed = new EmbedBuilder().setColor("Red").setTimestamp();
+  const embed = new EmbedBuilder().setColor(config.EMBED.COLOR.ERROR).setTimestamp();
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId(`confirm_${type}_${target.id}`).setLabel("Confirmar").setStyle(ButtonStyle.Danger)
   );
@@ -239,16 +239,15 @@ client.on('interactionCreate', async interaction => {
       interaction.update({ content:`✅ Ban realizado!`, components:[], embeds:[] });
       break;
     case "mute":
-      const muteTime = 10*60*1000;
+      const muteTime = config.MUTE.DEFAULT_DURATION_MINUTES*60*1000;
       client.mutes.set(userId, Date.now()+muteTime);
-      sendLog(interaction.guild, `🔇 ${member.user.tag} foi mutado por 10 minutos.`);
+      sendLog(interaction.guild, `🔇 ${member.user.tag} foi mutado por ${config.MUTE.DEFAULT_DURATION_MINUTES} minutos.`);
       interaction.update({ content:`✅ Mute realizado!`, components:[], embeds:[] });
       break;
   }
 });
 
 // ----------------- COMANDOS DE MODERAÇÃO -----------------
-// /mute
 client.commands.set('mute', {
   data: new (require('discord.js').SlashCommandBuilder)()
     .setName('mute')
@@ -256,7 +255,7 @@ client.commands.set('mute', {
     .addUserOption(opt => opt.setName('user').setDescription('Usuário a mutar').setRequired(true)),
   execute: async interaction => modAction(interaction,'mute')
 });
-// /unmute
+
 client.commands.set('unmute', {
   data: new (require('discord.js').SlashCommandBuilder)()
     .setName('unmute')
@@ -271,7 +270,7 @@ client.commands.set('unmute', {
     } else interaction.reply({ content:`❌ ${target.tag} não estava mutado.`, ephemeral:true });
   }
 });
-// /warn
+
 client.commands.set('warn', {
   data: new (require('discord.js').SlashCommandBuilder)()
     .setName('warn')
@@ -285,7 +284,7 @@ client.commands.set('warn', {
     interaction.reply({ content:`✅ ${user.tag} agora tem ${warns+1} warns.`, ephemeral:true });
   }
 });
-// /kick
+
 client.commands.set('kick', {
   data: new (require('discord.js').SlashCommandBuilder)()
     .setName('kick')
@@ -293,7 +292,7 @@ client.commands.set('kick', {
     .addUserOption(opt => opt.setName('user').setDescription('Usuário a kickar').setRequired(true)),
   execute: async interaction => modAction(interaction,'kick')
 });
-// /ban
+
 client.commands.set('ban', {
   data: new (require('discord.js').SlashCommandBuilder)()
     .setName('ban')

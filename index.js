@@ -1,125 +1,45 @@
-const { 
-Client,
-GatewayIntentBits,
-SlashCommandBuilder,
-REST,
-Routes,
-Events
-} = require("discord.js");
+const { REST, Routes, SlashCommandBuilder } = require('discord.js');
 
+const CLIENT_ID = "1479572164796747786"; // id do bot
+const GUILD_ID = "1012810818468991006"; // id do servidor
 const TOKEN = process.env.TOKEN;
-const CLIENT_ID = "1479572164796747786";
-
-const ROLE_ID = "1479888687033483294";
-const LOG_CHANNEL_ID = "1479521982356652194";
-const NOTIFY_USER_ID = "1465203429864374476";
-
-let mentionReply = "me mencionou?";
-
-const client = new Client({
-intents: [
-GatewayIntentBits.Guilds,
-GatewayIntentBits.GuildMembers,
-GatewayIntentBits.GuildMessages,
-GatewayIntentBits.MessageContent
-]
-});
-
-client.once("ready", () => {
-console.log(`✅ Bot online como ${client.user.tag}`);
-});
-
-
-// COMANDOS SLASH
 
 const commands = [
+  new SlashCommandBuilder()
+    .setName("setreply")
+    .setDescription("Define a resposta quando mencionarem o bot")
+    .addStringOption(option =>
+      option.setName("mensagem")
+        .setDescription("Mensagem que o bot vai responder")
+        .setRequired(true)
+    ),
 
-new SlashCommandBuilder()
-.setName("setreply")
-.setDescription("Define a resposta quando mencionarem o bot")
-.addStringOption(option =>
-option.setName("frase")
-.setDescription("Frase que o bot vai responder")
-.setRequired(true)
-)
+  new SlashCommandBuilder()
+    .setName("ping")
+    .setDescription("Ver latência do bot"),
 
+  new SlashCommandBuilder()
+    .setName("listroles")
+    .setDescription("Lista todos os cargos do servidor"),
+
+  new SlashCommandBuilder()
+    .setName("listchannels")
+    .setDescription("Lista todos os canais do servidor")
 ].map(cmd => cmd.toJSON());
 
-const rest = new REST({ version: "10" }).setToken(TOKEN);
+const rest = new REST({ version: '10' }).setToken(TOKEN);
 
 (async () => {
-try {
+  try {
+    console.log('Registrando slash commands...');
 
-await rest.put(
-Routes.applicationCommands(CLIENT_ID),
-{ body: commands }
-);
+    await rest.put(
+      Routes.applicationGuildCommands(CLIENT_ID, GUILD_ID),
+      { body: commands }
+    );
 
-console.log("✅ Slash commands registrados");
-
-} catch (error) {
-console.error(error);
-}
+    console.log('✅ Slash commands registrados no servidor');
+  } catch (error) {
+    console.error(error);
+  }
 })();
-
-
-// EXECUTAR COMANDOS
-
-client.on(Events.InteractionCreate, async interaction => {
-
-if (!interaction.isChatInputCommand()) return;
-
-if (interaction.commandName === "setreply") {
-
-const frase = interaction.options.getString("frase");
-
-mentionReply = frase;
-
-await interaction.reply("✅ Resposta de menção atualizada.");
-
-}
-
-});
-
-
-// RESPONDER MENÇÃO
-
-client.on("messageCreate", message => {
-
-if (message.author.bot) return;
-
-if (message.mentions.has(client.user)) {
-
-message.reply(mentionReply);
-
-}
-
-});
-
-
-// LOG DE CARGO
-
-client.on("guildMemberUpdate", (oldMember,newMember)=>{
-
-const hadRole = oldMember.roles.cache.has(ROLE_ID);
-const hasRole = newMember.roles.cache.has(ROLE_ID);
-
-const channel = newMember.guild.channels.cache.get(LOG_CHANNEL_ID);
-
-if(!channel) return;
-
-if(!hadRole && hasRole){
-
-channel.send(`🟢 <@${newMember.id}> ganhou o cargo <@&${ROLE_ID}> <@${NOTIFY_USER_ID}>`);
-
-}
-
-if(hadRole && !hasRole){
-
-channel.send(`🔴 <@${newMember.id}> perdeu o cargo <@&${ROLE_ID}> <@${NOTIFY_USER_ID}>`);
-
-}
-
-});
-
-client.login(TOKEN);

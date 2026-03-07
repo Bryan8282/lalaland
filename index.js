@@ -1,72 +1,99 @@
-const { Client, GatewayIntentBits, Partials, SlashCommandBuilder } = require('discord.js');
-const config = require('./config.json');
+const { Client, GatewayIntentBits } = require('discord.js');
 
-// ----------------- CLIENT -----------------
+// -------- CONFIG --------
+const TOKEN = process.env.TOKEN;
+
+const LOG_CHANNEL_ID = "1350550462218113044";
+const TARGET_ROLE_ID = "1479667422679138444";
+const NOTIFY_USER_ID = "1465203429864374476";
+
+// -------- CLIENT --------
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers
-  ],
-  partials: [Partials.Channel]
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 
-// ----------------- TOKEN -----------------
-const TOKEN = process.env.TOKEN;
+// -------- READY --------
+client.once('ready', () => {
+  console.log(`✅ Bot online como ${client.user.tag}`);
+});
 
-// ----------------- COLLECTIONS -----------------
-client.commands = new Map(); // Para comandos slash
+// -------- RESPOSTA AO SER MENCIONADO --------
+client.on('messageCreate', message => {
 
-// ----------------- LOGS DE CARGO -----------------
+  if (message.author.bot) return;
+
+  if (message.mentions.has(client.user)) {
+    message.reply("shut up nigga");
+  }
+
+});
+
+// -------- MEMBRO ENTROU --------
 client.on('guildMemberAdd', member => {
-  if(member.roles.cache.has(config.TARGET_ROLE_ID)){
-    const channel = member.guild.channels.cache.get(config.LOG_CHANNEL_ID);
-    if(channel) channel.send(`🟢 <@${member.id}> entrou no servidor com o cargo <@&${config.TARGET_ROLE_ID}>. <@${config.NOTIFY_USER_ID}>`);
+
+  if (member.roles.cache.has(TARGET_ROLE_ID)) {
+
+    const channel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
+
+    if (channel) {
+      channel.send(
+        `🟢 Entrou com o cargo\nUsuário: <@${member.id}>\nCargo: <@&${TARGET_ROLE_ID}>\n<@${NOTIFY_USER_ID}>`
+      );
+    }
+
   }
+
 });
 
+// -------- MEMBRO SAIU --------
 client.on('guildMemberRemove', member => {
-  if(member.roles.cache.has(config.TARGET_ROLE_ID)){
-    const channel = member.guild.channels.cache.get(config.LOG_CHANNEL_ID);
-    if(channel) channel.send(`🔴 <@${member.id}> saiu do servidor com o cargo <@&${config.TARGET_ROLE_ID}>. <@${config.NOTIFY_USER_ID}>`);
+
+  if (member.roles.cache.has(TARGET_ROLE_ID)) {
+
+    const channel = member.guild.channels.cache.get(LOG_CHANNEL_ID);
+
+    if (channel) {
+      channel.send(
+        `🔴 Saiu do servidor com o cargo\nUsuário: <@${member.id}>\nCargo: <@&${TARGET_ROLE_ID}>\n<@${NOTIFY_USER_ID}>`
+      );
+    }
+
   }
+
 });
 
-// ----------------- COMANDO /LIST -----------------
-client.commands.set('list', {
-  data: new SlashCommandBuilder()
-    .setName('list')
-    .setDescription('Lista todos os cargos e canais do servidor'),
-  execute: async interaction => {
-    const roles = interaction.guild.roles.cache
-      .map(r => `• ${r.name} - ${r.id}`)
-      .join("\n");
+// -------- GANHOU / PERDEU CARGO --------
+client.on('guildMemberUpdate', (oldMember, newMember) => {
 
-    const channels = interaction.guild.channels.cache
-      .map(c => `• ${c.name} (${c.type}) - ${c.id}`)
-      .join("\n");
+  const hadRole = oldMember.roles.cache.has(TARGET_ROLE_ID);
+  const hasRole = newMember.roles.cache.has(TARGET_ROLE_ID);
 
-    const embed = {
-      title: "📋 Lista de Cargos e Canais",
-      color: 0x00FFFF,
-      fields: [
-        { name: "Cargos", value: roles || "Nenhum cargo", inline: false },
-        { name: "Canais", value: channels || "Nenhum canal", inline: false }
-      ]
-    };
+  const channel = newMember.guild.channels.cache.get(LOG_CHANNEL_ID);
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+  if (!channel) return;
+
+  if (!hadRole && hasRole) {
+
+    channel.send(
+      `🟢 Ganhou o cargo\nUsuário: <@${newMember.id}>\nCargo: <@&${TARGET_ROLE_ID}>\n<@${NOTIFY_USER_ID}>`
+    );
+
   }
+
+  if (hadRole && !hasRole) {
+
+    channel.send(
+      `🔴 Perdeu o cargo\nUsuário: <@${newMember.id}>\nCargo: <@&${TARGET_ROLE_ID}>\n<@${NOTIFY_USER_ID}>`
+    );
+
+  }
+
 });
 
-// ----------------- INTERAÇÃO COM SLASH COMMANDS -----------------
-client.on('interactionCreate', async interaction => {
-  if(!interaction.isCommand()) return;
-  const command = client.commands.get(interaction.commandName);
-  if(!command) return;
-  try { await command.execute(interaction); }
-  catch(err){ console.error(err); interaction.reply({ content:"❌ Ocorreu um erro.", ephemeral:true }); }
-});
-
-// ----------------- LOGIN -----------------
-client.login(TOKEN).then(() => console.log(`✅ Bot online como ${client.user.tag}`))
-.catch(err => console.error('❌ Erro ao logar o bot:', err));
+// -------- LOGIN --------
+client.login(TOKEN);

@@ -1,6 +1,6 @@
 {
-  "name": "discord-role-logger",
-  "version": "1.0.0",
+  "name": "discord-role-monitor",
+  "version": "1.1.0",
   "description": "Bot de logs de cargo e resposta a menções",
   "main": "index.js",
   "scripts": {
@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "discord.js": "^14.14.1"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

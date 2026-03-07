@@ -1,6 +1,7 @@
 {
-  "name": "cargo-monitor",
+  "name": "discord-role-logger",
   "version": "1.0.0",
+  "description": "Bot de logs de cargo e resposta a menções",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

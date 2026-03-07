@@ -1,59 +1,10 @@
 {
-  "name": "Monkey D' Bryan",
-  "description": "Bot de segurança, avaliação de perfil, autoMod e comandos administrativos.",
-  "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
-  "author": "Bryan",
-  "license": "MIT",
-  "dependencies": {
-    "discord.js": "^14.13.0",
-    "mongoose": "^7.6.0",
-    "@discordjs/rest": "^1.7.0",
-    "discord-api-types": "^0.37.49"
-  },
-  "env": {
-    "TOKEN": "Seu_Token_Aqui",
-    "CLIENT_ID": "Seu_ClientID_Aqui",
-    "OWNER_ID": "Seu_ID_Aqui",
-    "MONGO_URI": "Sua_URI_MongoDB_Aqui",
-    "LOG_CHANNEL_ID": "ID_do_canal_de_logs"
-  },
-  "intents": [
+  "TOKEN": "MTQ3OTU3MjE2NDc5Njc0Nzc4Ng.GT42Zn.IA5hemOQSNqPFNl20oOxhM6lw9iMwfwg5QN4Os",
+  "LOG_CHANNEL_ID": "1479521982356652194",
+  "INTENTS": [
     "Guilds",
     "GuildMembers",
     "GuildMessages",
     "MessageContent"
-  ],
-  "partials": [
-    "Channel"
-  ],
-  "commands": [
-    "help",
-    "profile",
-    "compare",
-    "mute",
-    "unmute",
-    "warn",
-    "kick",
-    "ban",
-    "mutelist",
-    "warnlist",
-    "rank",
-    "setlog"
-  ],
-  "features": {
-    "automod": true,
-    "autoEvaluate": true,
-    "buttonConfirmBan": true,
-    "muteAutoRelease": true,
-    "rankPanels": true,
-    "logs": true,
-    "profileEvaluation": true,
-    "antiPornLinks": true,
-    "antiBlockedWords": true,
-    "replyMention": "shut up nigga"
-  }
+  ]
 }

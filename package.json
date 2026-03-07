@@ -1,42 +1,60 @@
 {
   "LOG_CHANNEL_ID": "1479521982356652194",
   "AUTO_MOD": {
-    "BLOCKED_WORDS": ["palavra1","palavra2"],
-    "BLOCKED_LINKS": ["discord.gg","bit.ly","tinyurl.com"]
+    "BLOCKED_WORDS": [
+      "palavrão1",
+      "palavrão2",
+      "palavrão3"
+    ],
+    "BLOCKED_LINKS": [
+      "discord.gg",
+      "https://spam.com",
+      "http://malware.com"
+    ]
   },
   "MUTE": {
-    "DEFAULT_DURATION_MINUTES": 10
+    "DEFAULT_DURATION_MINUTES": 5
   },
   "EMBED": {
     "COLOR": {
       "INFO": "Blue",
-      "WARN": "Orange",
+      "WARN": "Yellow",
       "ERROR": "Red",
       "SUCCESS": "Green"
     }
   },
-  "XP": {
-    "ENABLE": true
+  "PROFILE": {
+    "RANDOM_NAMES": true,
+    "RISK_MIN": 0,
+    "RISK_MAX": 100
+  },
+  "XP_SYSTEM": {
+    "ENABLED": true,
+    "MULTIPLIER": 1
+  },
+  "WARN_SYSTEM": {
+    "ENABLED": true,
+    "MAX_WARN": 5
+  },
+  "CHANNEL_CREATION": {
+    "ALLOW_PRIVATE": true,
+    "DEFAULT_CATEGORY": null
+  },
+  "MOD_ACTIONS": {
+    "ENABLE_BUTTON_CONFIRM": true
   },
   "COMMANDS": {
-    "ENABLE": true
-  },
-  "PROFILE": {
-    "ENABLE": true
-  },
-  "COMPARE": {
-    "ENABLE": true
-  },
-  "CREATE_CHANNEL": {
-    "ENABLE": true
-  },
-  "MODERATION": {
-    "ENABLE": true
-  },
-  "INTENTS": [
-    "Guilds",
-    "GuildMembers",
-    "GuildMessages",
-    "MessageContent"
-  ]
+    "HELP": true,
+    "PROFILE": true,
+    "COMPARE": true,
+    "MUTELIST": true,
+    "WARNLIST": true,
+    "RANK": true,
+    "CREATECHANNEL": true,
+    "MUTE": true,
+    "UNMUTE": true,
+    "WARN": true,
+    "KICK": true,
+    "BAN": true
+  }
 }
